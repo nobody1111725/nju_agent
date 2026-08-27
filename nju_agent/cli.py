@@ -1,4 +1,4 @@
-"""Command-line entry point for the first project milestone."""
+"""Command-line entry point for the programming Agent."""
 
 from __future__ import annotations
 
@@ -6,19 +6,24 @@ import argparse
 import sys
 
 from .config import ConfigurationError, Settings
+from .agent import Agent, AgentError
+from .model import ChatClient, ModelError
+from .tools import LocalTools
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nju-agent", description="A local programming-agent scaffold.")
-    parser.add_argument("--version", action="version", version="nju-agent 0.1.0")
+    parser.add_argument("--version", action="version", version="nju-agent 0.2.0")
     return parser
 
 
 def run_interactive(settings: Settings) -> int:
-    print("nju-agent 0.1.0")
+    print("nju-agent 0.2.0")
     print(f"Workspace: {settings.workspace}")
+    agent = None
     if settings.api_key and settings.model:
         print(f"Model configuration found: {settings.model}")
+        agent = Agent(ChatClient(api_key=settings.api_key, base_url=settings.base_url, model=settings.model), LocalTools(settings.workspace))
     else:
         print("Model configuration is not set; running in scaffold mode.")
     print("Type a task, or press Ctrl-D/Ctrl-Z to exit.")
@@ -30,8 +35,13 @@ def run_interactive(settings: Settings) -> int:
             print("\nGoodbye.")
             return 0
         if task:
-            print("Agent> Model integration is the next milestone; task received:")
-            print(f"       {task}")
+            if agent is None:
+                print("Agent> Please set NJU_AGENT_API_KEY and NJU_AGENT_MODEL first.")
+                continue
+            try:
+                print(f"Agent> {agent.run(task)}")
+            except (AgentError, ModelError) as exc:
+                print(f"Agent error> {exc}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,4 +56,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-

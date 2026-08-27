@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nju-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "A minimal programming agent for the Nanjing University Software Institute assessment."
 requires-python = ">=3.10"
 readme = "README.md"
@@ -15,4 +15,3 @@ nju-agent = "nju_agent.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["nju_agent*"]
-
