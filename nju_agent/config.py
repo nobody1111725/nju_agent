@@ -28,7 +28,7 @@ class Settings:
         if not workspace.is_dir():
             raise ConfigurationError(f"Workspace is not a directory: {workspace}")
 
-        base_url = os.getenv("NJU_AGENT_BASE_URL", "https://api.openai.com/v1").strip()
+        base_url = os.getenv("NJU_AGENT_BASE_URL", "https://api.deepseek.com/v1").strip()
         if not base_url:
             raise ConfigurationError("NJU_AGENT_BASE_URL cannot be empty")
 
@@ -38,4 +38,3 @@ class Settings:
             model=os.getenv("NJU_AGENT_MODEL") or None,
             workspace=workspace,
         )
-

@@ -25,7 +25,7 @@ python -m pip install -e .
 nju-agent
 ```
 
-配置示例见 `.env.example`。正式接入模型后，API Key 只能通过环境变量或未入库配置文件提供，不能写入 Git 仓库。
+配置示例见 `.env.example`，默认面向 `deepseek-v4-pro`。正式接入模型后，API Key 只能通过环境变量或未入库配置文件提供，不能写入 Git 仓库。
 
 ## 架构方向
 
