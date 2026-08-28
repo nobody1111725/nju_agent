@@ -13,12 +13,12 @@ from .tools import LocalTools
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nju-agent", description="A local programming-agent scaffold.")
-    parser.add_argument("--version", action="version", version="nju-agent 0.2.0")
+    parser.add_argument("--version", action="version", version="nju-agent 0.3.0")
     return parser
 
 
 def run_interactive(settings: Settings) -> int:
-    print("nju-agent 0.2.0")
+    print("nju-agent 0.3.0")
     print(f"Workspace: {settings.workspace}")
     agent = None
     if settings.api_key and settings.model:
