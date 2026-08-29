@@ -13,11 +13,12 @@ class ModelError(RuntimeError):
 
 
 class ChatClient:
-    def __init__(self, *, api_key: str, base_url: str, model: str, timeout: float = 60.0) -> None:
+    def __init__(self, *, api_key: str, base_url: str, model: str, timeout: float = 60.0, max_retries: int = 2) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
+        self.max_retries = max(0, max_retries)
 
     def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
         payload = {"model": self.model, "messages": messages, "tools": tools}
@@ -30,13 +31,20 @@ class ChatClient:
             },
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                result = json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
-            raise ModelError(f"Model request failed: {exc}") from exc
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ModelError("Model returned invalid JSON") from exc
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                break
+            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
+                last_error = exc
+                if attempt == self.max_retries:
+                    raise ModelError(f"Model request failed after {attempt + 1} attempts: {exc}") from exc
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ModelError("Model returned invalid JSON") from exc
+        else:
+            raise ModelError(f"Model request failed: {last_error}")
 
         try:
             message = result["choices"][0]["message"]
@@ -45,4 +53,3 @@ class ChatClient:
         if not isinstance(message, dict):
             raise ModelError("Model message is not an object")
         return message
-

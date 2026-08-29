@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 
 from .config import ConfigurationError, Settings
@@ -13,13 +14,14 @@ from .tools import LocalTools
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nju-agent", description="A local programming-agent scaffold.")
-    parser.add_argument("--version", action="version", version="nju-agent 0.3.0")
+    parser.add_argument("--version", action="version", version="nju-agent 0.4.0")
     return parser
 
 
 def run_interactive(settings: Settings) -> int:
-    print("nju-agent 0.3.0")
+    print("nju-agent 0.4.0")
     print(f"Workspace: {settings.workspace}")
+    logging.basicConfig(filename=settings.workspace / ".nju-agent.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     agent = None
     if settings.api_key and settings.model:
         print(f"Model configuration found: {settings.model}")
@@ -40,6 +42,8 @@ def run_interactive(settings: Settings) -> int:
                 continue
             try:
                 print(f"Agent> {agent.run(task)}")
+            except KeyboardInterrupt:
+                print("\nAgent> Task interrupted.")
             except (AgentError, ModelError) as exc:
                 print(f"Agent error> {exc}")
 

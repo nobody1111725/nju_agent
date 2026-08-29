@@ -22,6 +22,7 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        _load_dotenv(Path.cwd() / ".env")
         workspace = Path(os.getenv("NJU_AGENT_WORKSPACE", ".")).expanduser().resolve()
         if not workspace.exists():
             raise ConfigurationError(f"Workspace does not exist: {workspace}")
@@ -38,3 +39,18 @@ class Settings:
             model=os.getenv("NJU_AGENT_MODEL") or None,
             workspace=workspace,
         )
+
+
+def _load_dotenv(path: Path) -> None:
+    """Load simple KEY=VALUE entries without overwriting process variables."""
+    if not path.is_file():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key.isidentifier() and key not in os.environ:
+            os.environ[key] = value

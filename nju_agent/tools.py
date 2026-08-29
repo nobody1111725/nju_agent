@@ -127,11 +127,15 @@ class LocalTools:
         command = arguments.get("command")
         if not isinstance(command, str) or not command.strip():
             raise ToolError("command must be a non-empty string")
+        if self._is_blocked_command(command):
+            raise ToolError("Command blocked by safety policy")
         try:
             completed = subprocess.run(command, cwd=self.workspace, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=self.command_timeout)
         except subprocess.TimeoutExpired as exc:
             output = (exc.stdout or "") + (exc.stderr or "")
             return self._limit(f"timed out after {self.command_timeout:g}s\n{output}")
+        except OSError as exc:
+            raise ToolError(f"Could not start command: {exc}") from exc
         output = (completed.stdout or "") + (completed.stderr or "")
         return self._limit(f"exit_code: {completed.returncode}\n{output}")
 
@@ -140,3 +144,15 @@ class LocalTools:
             return text
         return text[: self.output_limit] + f"\n...[output truncated at {self.output_limit} characters]"
 
+    @staticmethod
+    def _is_blocked_command(command: str) -> bool:
+        normalized = " ".join(command.lower().split())
+        blocked = (
+            "rm -rf",
+            "rmdir /s",
+            "del /s",
+            "format ",
+            "shutdown ",
+            "git push",
+        )
+        return any(token in normalized for token in blocked)
