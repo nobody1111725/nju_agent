@@ -1,8 +1,10 @@
 #include <iostream>
 
 int main() {
-    for (int i = 1; i <= 100; ++i) {
+    int i = 20;
+    do {
         std::cout << i << std::endl;
-    }
+        ++i;
+    } while (i <= 50);
     return 0;
 }

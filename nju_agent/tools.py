@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
+from .planner import PlanError, TaskPlan
+
 ToolFunction = Callable[[dict[str, Any]], str]
 
 
@@ -17,16 +19,18 @@ class ToolError(ValueError):
 class LocalTools:
     """Definitions and implementations of tools available to the model."""
 
-    def __init__(self, workspace: Path, *, command_timeout: float = 30.0, output_limit: int = 12_000) -> None:
+    def __init__(self, workspace: Path, *, command_timeout: float = 30.0, output_limit: int = 12_000, plan: TaskPlan | None = None) -> None:
         self.workspace = workspace.resolve()
         self.command_timeout = command_timeout
         self.output_limit = output_limit
+        self.plan = plan or TaskPlan()
         self.functions: dict[str, ToolFunction] = {
             "list_files": self.list_files,
             "read_file": self.read_file,
             "write_file": self.write_file,
             "edit_file": self.edit_file,
             "run_command": self.run_command,
+            "update_plan": self.update_plan,
         }
 
     def definitions(self) -> list[dict[str, Any]]:
@@ -36,6 +40,7 @@ class LocalTools:
             self._definition("write_file", "Create or overwrite a UTF-8 text file in the workspace.", {"path": {"type": "string", "description": "Relative file path."}, "content": {"type": "string", "description": "Complete file content."}}, required=["path", "content"]),
             self._definition("edit_file", "Replace one exact text snippet in a UTF-8 file. The old text must occur exactly once.", {"path": {"type": "string", "description": "Relative file path."}, "old_text": {"type": "string", "description": "Exact text to replace."}, "new_text": {"type": "string", "description": "Replacement text."}}, required=["path", "old_text", "new_text"]),
             self._definition("run_command", "Run a shell command in the configured workspace and return its exit code and output.", {"command": {"type": "string", "description": "Command to execute."}}, required=["command"]),
+            self._definition("update_plan", "Create or update the task plan. Use this for multi-step programming tasks and mark completed steps.", {"steps": {"type": "array", "items": {"type": "string"}, "description": "Ordered task steps."}, "completed_steps": {"type": "array", "items": {"type": "integer"}, "description": "1-based step numbers already completed."}, "current_step": {"type": "integer", "description": "1-based step currently being worked on."}, "note": {"type": "string", "description": "Short progress note."}}, required=["steps"]),
         ]
 
     @staticmethod
@@ -138,6 +143,12 @@ class LocalTools:
             raise ToolError(f"Could not start command: {exc}") from exc
         output = (completed.stdout or "") + (completed.stderr or "")
         return self._limit(f"exit_code: {completed.returncode}\n{output}")
+
+    def update_plan(self, arguments: dict[str, Any]) -> str:
+        try:
+            return self.plan.update(arguments)
+        except PlanError as exc:
+            raise ToolError(str(exc)) from exc
 
     def _limit(self, text: str) -> str:
         if len(text) <= self.output_limit:
