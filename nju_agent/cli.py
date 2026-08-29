@@ -13,6 +13,7 @@ from typing import Any
 from .config import ConfigurationError, Settings
 from .agent import Agent, AgentError
 from .model import ChatClient, ModelError
+from .session import Session, SessionError, SessionStore
 from .tools import LocalTools
 
 
@@ -120,14 +121,33 @@ class TerminalToolDisplay:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nju-agent", description="A local programming-agent scaffold.")
-    parser.add_argument("--version", action="version", version="nju-agent 0.5.3")
+    parser.add_argument("--version", action="version", version="nju-agent 0.6.0")
+    parser.add_argument("--resume", metavar="SESSION", help="Resume a saved session by full or short ID.")
     return parser
 
 
-def run_interactive(settings: Settings) -> int:
-    print("nju-agent 0.5.3")
+def _print_session_history(session: Session) -> None:
+    """Show the human conversation portion of a saved session."""
+    exchanges = [
+        message for message in session.messages
+        if message.get("role") in {"user", "assistant"}
+        and isinstance(message.get("content"), str)
+        and message.get("content", "").strip()
+    ]
+    if not exchanges:
+        print("History> No previous chat messages.")
+        return
+    print(f"History> Previous chat ({len(exchanges)} messages):")
+    for message in exchanges:
+        speaker = "You" if message.get("role") == "user" else "Agent"
+        print(f"{speaker}> {message['content']}")
+
+
+def run_interactive(settings: Settings, *, resume_id: str | None = None) -> int:
+    print("nju-agent 0.6.0")
     print(f"Workspace: {settings.workspace}")
     logging.basicConfig(filename=settings.workspace / ".nju-agent.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    store = SessionStore(settings.workspace)
     display = TerminalToolDisplay()
     agent = None
     if settings.api_key and settings.model:
@@ -141,6 +161,24 @@ def run_interactive(settings: Settings) -> int:
     else:
         print("Model configuration is not set; running in scaffold mode.")
     print("Type a task, or press Ctrl-D/Ctrl-Z to exit.")
+    active_session: Session | None = None
+    resume_mode = False
+    if resume_id:
+        try:
+            active_session = store.load(resume_id)
+        except SessionError as exc:
+            print(f"Session error> {exc}")
+        if active_session is None:
+            print(f"Session> No saved session matches: {resume_id}")
+        elif agent is not None:
+            try:
+                agent.plan.restore(active_session.plan)
+                resume_mode = True
+                print(f"Session> Resumed {active_session.short_id} (updated {active_session.updated_at})")
+                _print_session_history(active_session)
+            except (TypeError, ValueError) as exc:
+                print(f"Session error> Invalid saved plan: {exc}")
+                active_session = None
 
     while True:
         try:
@@ -149,11 +187,57 @@ def run_interactive(settings: Settings) -> int:
             print("\nGoodbye.")
             return 0
         if task:
+            if task == "/sessions":
+                try:
+                    sessions = store.list()
+                except SessionError as exc:
+                    print(f"Session error> {exc}")
+                    continue
+                if not sessions:
+                    print("Session> No saved sessions.")
+                else:
+                    for session in sessions:
+                        print(f"Session> {session.short_id}  {session.updated_at}  messages={len(session.messages)}")
+                continue
+            if task == "/new":
+                active_session = None
+                resume_mode = False
+                if agent is not None:
+                    agent.plan.reset()
+                print("Session> Started a new session.")
+                continue
+            if task.startswith("/resume"):
+                requested = task.partition(" ")[2].strip() or None
+                try:
+                    selected = store.load(requested)
+                except SessionError as exc:
+                    print(f"Session error> {exc}")
+                    continue
+                if selected is None:
+                    print("Session> No matching saved session.")
+                    continue
+                if agent is not None:
+                    try:
+                        agent.plan.restore(selected.plan)
+                    except (TypeError, ValueError) as exc:
+                        print(f"Session error> Invalid saved plan: {exc}")
+                        continue
+                active_session, resume_mode = selected, True
+                print(f"Session> Resumed {selected.short_id}.")
+                _print_session_history(selected)
+                continue
             if agent is None:
                 print("Agent> Please set NJU_AGENT_API_KEY and NJU_AGENT_MODEL first.")
                 continue
             try:
-                answer = agent.run(task)
+                if active_session is None:
+                    active_session = store.create()
+                answer = agent.run(task, history=active_session.messages if resume_mode else None, resume=resume_mode)
+                active_session.messages = agent.last_messages
+                active_session.plan = agent.plan.snapshot()
+                store.save(active_session)
+                resume_mode = True
+                print(f"Session> Saved {active_session.short_id}")
                 print(f"Agent> {answer}")
                 if agent.plan.steps:
                     print(f"Plan>\n{agent.plan.render()}")
@@ -161,16 +245,18 @@ def run_interactive(settings: Settings) -> int:
                 print("\nAgent> Task interrupted.")
             except (AgentError, ModelError) as exc:
                 print(f"Agent error> {exc}")
+            except SessionError as exc:
+                print(f"Session error> {exc}")
 
 
 def main(argv: list[str] | None = None) -> int:
-    build_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
     try:
         settings = Settings.from_env()
     except ConfigurationError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
-    return run_interactive(settings)
+    return run_interactive(settings, resume_id=args.resume)
 
 
 if __name__ == "__main__":  # pragma: no cover

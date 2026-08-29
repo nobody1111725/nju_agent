@@ -23,6 +23,15 @@ class TaskPlan:
         self.current_step = None
         self.note = ""
 
+    def snapshot(self) -> dict[str, Any]:
+        return {"steps": self.steps[:], "completed_steps": sorted(self.completed_steps), "current_step": self.current_step, "note": self.note}
+
+    def restore(self, data: dict[str, Any]) -> None:
+        if not isinstance(data, dict) or not data or not data.get("steps"):
+            self.reset()
+            return
+        self.update(data)
+
     def update(self, arguments: dict[str, Any]) -> str:
         steps = arguments.get("steps", self.steps)
         completed = arguments.get("completed_steps", list(self.completed_steps))

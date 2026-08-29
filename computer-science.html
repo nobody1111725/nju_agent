@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>计算机科学与技术专业 · 介绍与深造方向</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --accent: #06b6d4;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-light: #64748b;
+      --border: #e2e8f0;
+      --gradient: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #06b6d4 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ===== 导航栏 ===== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .navbar .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar .logo .icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--primary-light);
+    }
+
+    @media (max-width: 640px) {
+      .navbar {
+        padding: 0 1rem;
+      }
+      .nav-links {
+        gap: 1rem;
+      }
+      .nav-links a {
+        font-size: 0.85rem;
+      }
+    }
+
+    /* ===== Hero ===== */
+    .hero {
+      background: var(--gradient);
+      color: #fff;
+      text-align: center;
+      padding: 5rem 1.5rem 6rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.18), transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.12), transparent 40%);
+      pointer-events: none;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .en {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      letter-spacing: 2px;
+      margin-bottom: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero p {
+      max-width: 720px;
+      margin: 0 auto;
+      font-size: 1.1rem;
+      opacity: 0.95;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .badges {
+      margin-top: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .badge {
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      padding: 0.5rem 1.25rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      backdrop-filter: blur(4px);
+    }
+
+    @media (max-width: 640px) {
+      .hero h1 {
+        font-size: 2rem;
+      }
+      .hero p {
+        font-size: 1rem;
+      }
+    }
+
+    /* ===== 通用布局 ===== */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    section {
+      padding: 4rem 0;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+      color: var(--primary);
+    }
+
+    .section-subtitle {
+      text-align: center;
+      color: var(--text-light);
+      max-width: 640px;
+      margin: 0 auto 3rem;
+    }
+
+    /* ===== 专业简介 ===== */
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 2.5rem;
+      align-items: center;
+    }
+
+    .intro-text p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .intro-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(30, 58, 138, 0.12);
+    }
+
+    .stat-card .num {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary-light);
+    }
+
+    .stat-card .label {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    @media (max-width: 800px) {
+      .intro-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ===== 课程卡片 ===== */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .course-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .course-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary-light);
+    }
+
+    .course-card .emoji {
+      font-size: 1.8rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .course-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--primary);
+    }
+
+    .course-card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .course-card li {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      padding: 0.2rem 0;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .course-card li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    /* ===== 深造方向 ===== */
+    .directions {
+      background: #eef2ff;
+    }
+
+    .direction-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 6px 18px rgba(30, 58, 138, 0.08);
+      border-left: 4px solid var(--primary-light);
+      margin-bottom: 1.5rem;
+      transition: transform 0.2s;
+    }
+
+    .direction-card:hover {
+      transform: translateX(6px);
+    }
+
+    .direction-card h3 {
+      color: var(--primary);
+      font-size: 1.3rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .direction-card .desc {
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+
+    .direction-card .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .direction-card .tag {
+      background: #e0e7ff;
+      color: #3730a3;
+      font-size: 0.82rem;
+      padding: 0.3rem 0.9rem;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    /* ===== 时间线（深造路径） ===== */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .timeline-step {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .timeline-step .step-num {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 1rem;
+      background: var(--gradient);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timeline-step h3 {
+      margin-bottom: 0.5rem;
+      color: var(--primary);
+    }
+
+    .timeline-step p {
+      color: var(--text-light);
+      font-size: 0.92rem;
+    }
+
+    /* ===== 就业方向 ===== */
+    .job-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .job-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+      font-weight: 500;
+      color: var(--text);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .job-item:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    /* ===== 页脚 ===== */
+    footer {
+      background: #0f172a;
+      color: #94a3b8;
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    footer .heart {
+      color: #f43f5e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 导航栏 -->
+  <nav class="navbar">
+    <div class="logo">
+      <span class="icon">⌘</span>
+      CS 专业导航
+    </div>
+    <ul class="nav-links">
+      <li><a href="#intro">专业简介</a></li>
+      <li><a href="#courses">核心课程</a></li>
+      <li><a href="#directions">深造方向</a></li>
+      <li><a href="#jobs">就业前景</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <h1>计算机科学与技术</h1>
+    <div class="en">Computer Science and Technology</div>
+    <p>
+      融合数学、逻辑与工程思维，研究计算机系统的设计、开发与应用，
+      培养具备扎实理论基础与工程实践能力的复合型人才。
+    </p>
+    <div class="badges">
+      <span class="badge">💻 编程与算法</span>
+      <span class="badge">🧠 人工智能</span>
+      <span class="badge">🌐 网络与系统</span>
+      <span class="badge">🔒 信息安全</span>
+      <span class="badge">📊 数据科学</span>
+    </div>
+  </header>
+
+  <!-- 专业简介 -->
+  <section id="intro">
+    <div class="container">
+      <h2 class="section-title">专业简介</h2>
+      <p class="section-subtitle">计算机科学与技术是一门研究计算机及其应用的科学，涵盖理论与工程两大方向。</p>
+      <div class="intro-grid">
+        <div class="intro-text">
+          <p>
+            计算机科学与技术（Computer Science and Technology）是研究计算机的设计、制造和利用，
+            以及进行信息获取、表示、存储、处理、控制的理论、原则、方法和技术的学科。
+          </p>
+          <p>
+            它既包含<strong>计算机理论</strong>（如算法、计算复杂性、自动机理论），
+            也包含<strong>计算机系统</strong>（如操作系统、体系结构、编译原理），
+            还包含<strong>计算机应用</strong>（如人工智能、数据库、计算机网络、软件工程等）。
+          </p>
+          <p>
+            该专业强调「软硬结合、理论与实践并重」，毕业生既可以继续攻读研究生深入科研，
+            也可以进入 IT 行业从事开发、算法、测试、运维等工作。
+          </p>
+        </div>
+        <div class="intro-stats">
+          <div class="stat-card">
+            <div class="num">4 年</div>
+            <div class="label">本科学制</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">工学</div>
+            <div class="label">授予学位</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">50+</div>
+            <div class="label">核心课程门数</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">10+</div>
+            <div class="label">深造研究方向</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 核心课程 -->
+  <section id="courses">
+    <div class="container">
+      <h2 class="section-title">核心课程</h2>
+      <p class="section-subtitle">打好基础，才能走得更远。以下为本科阶段的重要课程板块。</p>
+      <div class="cards-grid">
+        <div class="course-card">
+          <div class="emoji">🧮</div>
+          <h3>数学基础</h3>
+          <ul>
+            <li>高等数学</li>
+            <li>线性代数</li>
+            <li>概率论与数理统计</li>
+            <li>离散数学</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">💻</div>
+          <h3>编程基础</h3>
+          <ul>
+            <li>C / C++ 程序设计</li>
+            <li>Java / Python</li>
+            <li>数据结构</li>
+            <li>算法设计与分析</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">⚙️</div>
+          <h3>系统与硬件</h3>
+          <ul>
+            <li>计算机组成原理</li>
+            <li>操作系统</li>
+            <li>编译原理</li>
+            <li>计算机体系结构</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">🌐</div>
+          <h3>网络与数据</h3>
+          <ul>
+            <li>计算机网络</li>
+            <li>数据库系统</li>
+            <li>分布式系统</li>
+            <li>云计算基础</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">🧠</div>
+          <h3>智能与应用</h3>
+          <ul>
+            <li>人工智能导论</li>
+            <li>机器学习</li>
+            <li>数字图像处理</li>
+            <li>自然语言处理</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">🔒</div>
+          <h3>工程与安全</h3>
+          <ul>
+            <li>软件工程</li>
+            <li>信息安全</li>
+            <li>密码学基础</li>
+            <li>人机交互</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 深造方向 -->
+  <section id="directions" class="directions">
+    <div class="container">
+      <h2 class="section-title">深造方向</h2>
+      <p class="section-subtitle">
+        本科毕业后可选择继续攻读硕士 / 博士研究生，以下为计算机科学与技术专业主要的研究与深造方向。
+      </p>
+
+      <div class="direction-card">
+        <h3>🤖 人工智能与机器学习</h3>
+        <p class="desc">
+          研究如何让计算机模拟人类智能，包括机器学习、深度学习、强化学习、计算机视觉与自然语言处理等前沿领域。
+        </p>
+        <div class="tags">
+          <span class="tag">深度学习</span>
+          <span class="tag">计算机视觉</span>
+          <span class="tag">自然语言处理</span>
+          <span class="tag">强化学习</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>🗄️ 计算机系统结构</h3>
+        <p class="desc">
+          研究计算机硬件与系统的组织与设计，包括处理器架构、并行计算、高性能计算、芯片设计与嵌入式系统等。
+        </p>
+        <div class="tags">
+          <span class="tag">并行计算</span>
+          <span class="tag">高性能计算</span>
+          <span class="tag">嵌入式系统</span>
+          <span class="tag">体系结构</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>📐 计算机软件与理论</h3>
+        <p class="desc">
+          侧重计算理论、算法设计与分析、形式化方法、程序设计语言理论等，是计算机科学的理论基础方向。
+        </p>
+        <div class="tags">
+          <span class="tag">算法设计</span>
+          <span class="tag">计算复杂性</span>
+          <span class="tag">形式化方法</span>
+          <span class="tag">程序语言理论</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>🛡️ 网络与信息安全</h3>
+        <p class="desc">
+          研究网络通信、系统安全、密码学、漏洞分析与防御技术，保障信息系统的机密性、完整性与可用性。
+        </p>
+        <div class="tags">
+          <span class="tag">密码学</span>
+          <span class="tag">网络安全</span>
+          <span class="tag">系统安全</span>
+          <span class="tag">区块链</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>📊 数据科学与大数据</h3>
+        <p class="desc">
+          研究海量数据的采集、存储、处理与分析技术，结合统计与机器学习，从数据中挖掘有价值的信息。
+        </p>
+        <div class="tags">
+          <span class="tag">数据挖掘</span>
+          <span class="tag">大数据平台</span>
+          <span class="tag">数据可视化</span>
+          <span class="tag">分布式计算</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>🔧 软件工程</h3>
+        <p class="desc">
+          研究软件开发的工程化方法，包括需求分析、架构设计、测试维护、DevOps 与软件项目管理等。
+        </p>
+        <div class="tags">
+          <span class="tag">软件架构</span>
+          <span class="tag">DevOps</span>
+          <span class="tag">软件测试</span>
+          <span class="tag">项目管理</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 深造路径 -->
+  <section id="path">
+    <div class="container">
+      <h2 class="section-title">深造路径规划</h2>
+      <p class="section-subtitle">从本科到研究生的常见成长路线。</p>
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="step-num">1</div>
+          <h3>夯实基础</h3>
+          <p>学好数学、数据结构与算法、操作系统等核心课程，打好理论基础。</p>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">2</div>
+          <h3>确定方向</h3>
+          <p>结合兴趣选择 AI、系统、安全、数据等方向，选修相关课程。</p>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">3</div>
+          <h3>科研实践</h3>
+          <p>参与导师课题、实验室项目或学科竞赛，积累科研与工程经验。</p>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">4</div>
+          <h3>升学深造</h3>
+          <p>通过保研、考研或出国留学，进入理想的硕士 / 博士项目。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 就业前景 -->
+  <section id="jobs">
+    <div class="container">
+      <h2 class="section-title">就业前景</h2>
+      <p class="section-subtitle">计算机科学与技术专业就业面广、需求量大，可从事以下岗位。</p>
+      <div class="job-grid">
+        <div class="job-item">后端开发工程师</div>
+        <div class="job-item">前端开发工程师</div>
+        <div class="job-item">算法工程师</div>
+        <div class="job-item">人工智能工程师</div>
+        <div class="job-item">数据分析师</div>
+        <div class="job-item">网络安全工程师</div>
+        <div class="job-item">系统架构师</div>
+        <div class="job-item">嵌入式开发工程师</div>
+        <div class="job-item">测试开发工程师</div>
+        <div class="job-item">科研人员 / 高校教师</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer>
+    <p>计算机科学与技术专业 · 介绍与深造方向</p>
+    <p style="margin-top: 0.5rem;">用心编写 <span class="heart">♥</span> 为每一位 CS 学子加油</p>
+  </footer>
+
+</body>
+</html>

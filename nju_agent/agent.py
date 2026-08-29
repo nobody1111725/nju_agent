@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from copy import deepcopy
 from typing import Any, Callable, Protocol
 
 from .context import ContextManager
@@ -33,16 +34,24 @@ class Agent:
         self.on_tool_end = on_tool_end
         self.context = ContextManager(max_chars=max_context_chars)
         self.plan: TaskPlan = tools.plan
+        self.last_messages: list[dict[str, Any]] = []
 
-    def run(self, task: str) -> str:
-        self.plan.reset()
-        messages: list[dict[str, Any]] = [
+    def run(self, task: str, *, history: list[dict[str, Any]] | None = None, resume: bool = False) -> str:
+        if history is not None and resume:
+            messages = deepcopy(history)
+            if not messages or messages[0].get("role") != "system":
+                raise AgentError("Saved session has no system message")
+            messages.append({"role": "user", "content": task})
+        else:
+            self.plan.reset()
+            messages = [
             {
                 "role": "system",
                 "content": self._system_prompt(),
             },
             {"role": "user", "content": task},
-        ]
+            ]
+        self.last_messages = messages
         repeated_error = None
         repeated_count = 0
         last_tool_signature = None
@@ -50,11 +59,14 @@ class Agent:
         inspection_rounds = 0
         for step in range(self.max_steps):
             messages[0]["content"] = self._system_prompt()
-            messages = self.context.compact(messages)
-            self.logger.info("context chars=%d", self.context.size(messages))
+            # Compact only the request copy. The persisted conversation must
+            # retain every user, assistant, and tool message for later resume.
+            request_messages = self.context.compact(deepcopy(messages))
+            self.last_messages = deepcopy(messages)
+            self.logger.info("context chars=%d", self.context.size(request_messages))
             self.logger.info("model request step=%d", step + 1)
             try:
-                message = self.client.complete(messages, self.tools.definitions())
+                message = self.client.complete(request_messages, self.tools.definitions())
             except KeyboardInterrupt:
                 raise AgentError("Task interrupted by user") from None
             if not isinstance(message, dict):
@@ -66,6 +78,10 @@ class Agent:
             if not tool_calls:
                 if not isinstance(content, str) or not content.strip():
                     raise AgentError("Model returned neither a final answer nor a tool call")
+                # Keep the model-call list stable for observers/tests while
+                # exporting a history that includes the final answer.
+                self.last_messages = deepcopy(messages)
+                self.last_messages.append({"role": "assistant", "content": content})
                 return content.strip()
 
             assistant_message = {"role": "assistant", "content": content, "tool_calls": tool_calls}

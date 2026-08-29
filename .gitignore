@@ -8,6 +8,7 @@ venv/
 !.env.example
 *.log
 .nju-agent.log
+.nju-agent-sessions.json
 .pytest_cache/
 dist/
 build/
