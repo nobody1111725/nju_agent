@@ -81,6 +81,18 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(events[0], ("start", "list_files"))
             self.assertEqual(events[1], ("end", "list_files", True))
 
+    def test_model_response_observer_runs_only_after_model_returns(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            observed = []
+            client = FakeClient([{"content": "完成", "tool_calls": []}])
+            answer = Agent(
+                client,
+                LocalTools(Path(directory)),
+                on_model_response=lambda: observed.append("received"),
+            ).run("测试响应状态")
+            self.assertEqual(answer, "完成")
+            self.assertEqual(observed, ["received"])
+
     def test_terminal_display_parses_json_tool_arguments(self) -> None:
         self.assertEqual(
             TerminalToolDisplay._label("read_file", '{"path":"print_1_to_100.cpp","start_line":1,"end_line":20}'),

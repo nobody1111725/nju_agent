@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>南京大学 · 校史与风采</title>
+  <style>
+    :root {
+      --nju-blue: #0f4c81;
+      --nju-purple: #5b2c83;
+      --nju-gold: #c9a063;
+      --bg: #f7f8fa;
+      --card-bg: #ffffff;
+      --text: #1f2d3d;
+      --text-light: #5e6b7a;
+      --border: #e3e8ee;
+      --gradient: linear-gradient(135deg, #0f4c81 0%, #3f6ca3 50%, #5b2c83 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    /* ===== 顶部横幅 ===== */
+    .hero {
+      position: relative;
+      min-height: 92vh;
+      background: var(--gradient);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 4rem 2rem;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.12), transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(201, 160, 99, 0.25), transparent 45%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      position: relative;
+      display: inline-block;
+      padding: 0.4rem 1.2rem;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 999px;
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      margin-bottom: 2rem;
+    }
+
+    .hero h1 {
+      position: relative;
+      font-size: clamp(3rem, 8vw, 5.5rem);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+
+    .hero .en-name {
+      position: relative;
+      font-size: 1.2rem;
+      letter-spacing: 0.35em;
+      opacity: 0.9;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+    }
+
+    .hero .motto {
+      position: relative;
+      font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+      font-weight: 300;
+      letter-spacing: 0.2em;
+      margin-bottom: 2.5rem;
+      color: #f3e9d2;
+    }
+
+    .hero .founded {
+      position: relative;
+      font-size: 1rem;
+      opacity: 0.85;
+      letter-spacing: 0.1em;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5rem;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translate(-50%, 0); }
+      50% { transform: translate(-50%, 10px); }
+    }
+
+    /* ===== 导航栏 ===== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .navbar .logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--nju-blue);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar .logo .icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text-light);
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--nju-blue);
+    }
+
+    /* ===== 通用区块 ===== */
+    .section {
+      padding: 5rem 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .section-title h2 {
+      font-size: 2.2rem;
+      color: var(--nju-blue);
+      margin-bottom: 0.5rem;
+    }
+
+    .section-title p {
+      color: var(--text-light);
+    }
+
+    .section-title::after {
+      content: "";
+      display: block;
+      width: 64px;
+      height: 4px;
+      margin: 1rem auto 0;
+      background: var(--gradient);
+      border-radius: 2px;
+    }
+
+    /* ===== 概览卡片 ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 28px rgba(15, 76, 129, 0.12);
+    }
+
+    .stat-card .number {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: var(--nju-blue);
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-card .label {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    /* ===== 校史时间线 ===== */
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(var(--nju-blue), var(--nju-gold));
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 2.5rem;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -1.75rem;
+      top: 2rem;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--nju-blue);
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 3px var(--nju-blue);
+    }
+
+    .timeline-item .year {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--nju-blue);
+    }
+
+    .timeline-item p {
+      color: var(--text-light);
+      margin-top: 0.3rem;
+    }
+
+    /* ===== 校区 ===== */
+    .campus-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .campus-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: transform 0.25s;
+    }
+
+    .campus-card:hover {
+      transform: translateY(-6px);
+      border-color: var(--nju-gold);
+    }
+
+    .campus-card h3 {
+      color: var(--nju-blue);
+      margin-bottom: 0.5rem;
+      font-size: 1.3rem;
+    }
+
+    .campus-card p {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    /* ===== 学科优势 ===== */
+    .feature-list {
+      list-style: none;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .feature-list .dot {
+      flex-shrink: 0;
+      width: 10px;
+      height: 10px;
+      margin-top: 0.6rem;
+      border-radius: 50%;
+      background: var(--nju-gold);
+    }
+
+    .feature-list strong {
+      color: var(--nju-blue);
+    }
+
+    .feature-list p {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    /* ===== 页脚 ===== */
+    footer {
+      background: #14202e;
+      color: #b8c4d0;
+      text-align: center;
+      padding: 3rem 2rem;
+      margin-top: 3rem;
+    }
+
+    footer .motto-big {
+      color: #e8e2d4;
+      font-size: 1.1rem;
+      letter-spacing: 0.3em;
+      margin-bottom: 0.8rem;
+    }
+
+    footer small {
+      display: block;
+      margin-top: 1rem;
+      opacity: 0.7;
+    }
+
+    @media (max-width: 640px) {
+      .nav-links {
+        gap: 0.8rem;
+      }
+      .nav-links a {
+        font-size: 0.8rem;
+      }
+      .section {
+        padding: 3rem 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部横幅 -->
+  <header class="hero">
+    <div class="hero-badge">双一流 · 985 工程 · 211 工程</div>
+    <h1>南京大学</h1>
+    <div class="en-name">Nanjing University · NJU</div>
+    <p class="motto">诚朴雄伟 · 励学敦行</p>
+    <p class="founded">肇始于 1902 年 三江师范学堂</p>
+    <div class="scroll-hint">⌄</div>
+  </header>
+
+  <!-- 导航栏 -->
+  <nav class="navbar">
+    <div class="logo">
+      <span class="icon">南</span>
+      <span>南京大学</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#overview">学校概览</a></li>
+      <li><a href="#history">校史沿革</a></li>
+      <li><a href="#campus">校区分布</a></li>
+      <li><a href="#strength">学科优势</a></li>
+    </ul>
+  </nav>
+
+  <!-- 学校概览 -->
+  <section class="section" id="overview">
+    <div class="section-title">
+      <h2>学校概览</h2>
+      <p>一所历史悠久、声誉卓著的百年名校</p>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="number">1902</div>
+        <div class="label">建校年份</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">C9</div>
+        <div class="label">九校联盟成员</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">4</div>
+        <div class="label">主要校区</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">30+</div>
+        <div class="label">学院 / 直属教学单位</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 校史沿革 -->
+  <section class="section" id="history">
+    <div class="section-title">
+      <h2>校史沿革</h2>
+      <p>从三江师范学堂到世界一流大学</p>
+    </div>
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="year">1902</div>
+        <p>两江总督刘坤一、张之洞等上奏创办三江师范学堂，后更名为两江师范学堂。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">1928</div>
+        <p>改建为国立中央大学，成为当时规模最大、学科最全的综合性大学之一。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">1949</div>
+        <p>更名为国立南京大学，次年定名南京大学。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">1994</div>
+        <p>首批进入国家「211 工程」重点建设高校行列。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">1999</div>
+        <p>首批进入国家「985 工程」重点建设高校行列。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">2017</div>
+        <p>入选国家「双一流」建设高校名单，多学科进入一流学科建设行列。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 校区分布 -->
+  <section class="section" id="campus">
+    <div class="section-title">
+      <h2>校区分布</h2>
+      <p>一校多区，协同发展</p>
+    </div>
+    <div class="campus-grid">
+      <div class="campus-card">
+        <h3>仙林校区</h3>
+        <p>主校区，位于栖霞区，是现代化、生态化的综合性新校区，也是多数本科与研究生教学科研活动的中心。</p>
+      </div>
+      <div class="campus-card">
+        <h3>鼓楼校区</h3>
+        <p>历史底蕴深厚的经典校区，坐落于南京市中心，北大楼等地标建筑见证百年校史。</p>
+      </div>
+      <div class="campus-card">
+        <h3>浦口校区</h3>
+        <p>位于江北新区，承担部分人才培养与科研功能，是学校发展的重要延伸。</p>
+      </div>
+      <div class="campus-card">
+        <h3>苏州校区</h3>
+        <p>服务长三角一体化战略的新兴校区，聚焦新兴交叉学科与产学研融合。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 学科优势 -->
+  <section class="section" id="strength">
+    <div class="section-title">
+      <h2>学科优势</h2>
+      <p>文理工医协调发展，基础学科实力雄厚</p>
+    </div>
+    <ul class="feature-list">
+      <li>
+        <span class="dot"></span>
+        <div><strong>基础学科领先：</strong><p>物理学、化学、天文学、地质学、地理学、大气科学、中国语言文学、外国语言文学、图书情报与档案管理等多个学科实力位居全国前列。</p></div>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <div><strong>新兴交叉学科：</strong><p>人工智能、计算机科学与技术、环境科学与工程、生命科学、医学等学科快速发展，产出一批高水平科研成果。</p></div>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <div><strong>拔尖人才培养：</strong><p>设有匡亚明学院、各类基础学科拔尖学生培养基地，致力于培养具有创新精神和国际视野的领军人才。</p></div>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <div><strong>开放合作：</strong><p>与全球众多顶尖高校和科研机构建立合作关系，国际学术影响力持续提升。</p></div>
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    <div class="motto-big">诚朴雄伟 · 励学敦行</div>
+    <div>南京大学 · Nanjing University</div>
+    <small>本页面为介绍性展示页面，相关信息仅供参考。</small>
+  </footer>
+
+</body>
+</html>

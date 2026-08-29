@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>软件工程专业 · 介绍与深造方向</title>
+  <style>
+    :root {
+      --primary: #4c1d95;
+      --primary-light: #7c3aed;
+      --accent: #d946ef;
+      --bg: #faf9ff;
+      --card-bg: #ffffff;
+      --text: #1e1b2e;
+      --text-light: #6b7280;
+      --border: #e5e7eb;
+      --gradient: linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #c026d3 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ===== 导航栏 ===== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .navbar .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar .logo .icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--primary-light);
+    }
+
+    @media (max-width: 640px) {
+      .navbar {
+        padding: 0 1rem;
+      }
+      .nav-links {
+        gap: 1rem;
+      }
+      .nav-links a {
+        font-size: 0.85rem;
+      }
+    }
+
+    /* ===== Hero ===== */
+    .hero {
+      background: var(--gradient);
+      color: #fff;
+      text-align: center;
+      padding: 5rem 1.5rem 6rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.18), transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.12), transparent 40%);
+      pointer-events: none;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .en {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      letter-spacing: 2px;
+      margin-bottom: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero p {
+      max-width: 720px;
+      margin: 0 auto;
+      font-size: 1.1rem;
+      opacity: 0.95;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .badges {
+      margin-top: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .badge {
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      padding: 0.5rem 1.25rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      backdrop-filter: blur(4px);
+    }
+
+    @media (max-width: 640px) {
+      .hero h1 {
+        font-size: 2rem;
+      }
+      .hero p {
+        font-size: 1rem;
+      }
+    }
+
+    /* ===== 通用布局 ===== */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    section {
+      padding: 4rem 0;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+      color: var(--primary);
+    }
+
+    .section-subtitle {
+      text-align: center;
+      color: var(--text-light);
+      max-width: 640px;
+      margin: 0 auto 3rem;
+    }
+
+    /* ===== 专业简介 ===== */
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 2.5rem;
+      align-items: center;
+    }
+
+    .intro-text p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .intro-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(76, 29, 149, 0.12);
+    }
+
+    .stat-card .num {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary-light);
+    }
+
+    .stat-card .label {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    @media (max-width: 800px) {
+      .intro-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ===== 课程卡片 ===== */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .course-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .course-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary-light);
+    }
+
+    .course-card .emoji {
+      font-size: 1.8rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .course-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--primary);
+    }
+
+    .course-card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .course-card li {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      padding: 0.2rem 0;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .course-card li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    /* ===== 深造方向 ===== */
+    .directions {
+      background: #f3e8ff;
+    }
+
+    .direction-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 6px 18px rgba(76, 29, 149, 0.08);
+      border-left: 4px solid var(--primary-light);
+      margin-bottom: 1.5rem;
+      transition: transform 0.2s;
+    }
+
+    .direction-card:hover {
+      transform: translateX(6px);
+    }
+
+    .direction-card h3 {
+      color: var(--primary);
+      font-size: 1.3rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .direction-card .desc {
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+
+    .direction-card .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .direction-card .tag {
+      background: #ede9fe;
+      color: #5b21b6;
+      font-size: 0.82rem;
+      padding: 0.3rem 0.9rem;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    /* ===== 时间线（深造路径） ===== */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .timeline-step {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .timeline-step .step-num {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 1rem;
+      background: var(--gradient);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timeline-step h3 {
+      margin-bottom: 0.5rem;
+      color: var(--primary);
+    }
+
+    .timeline-step p {
+      color: var(--text-light);
+      font-size: 0.92rem;
+    }
+
+    /* ===== 就业方向 ===== */
+    .job-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .job-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+      font-weight: 500;
+      color: var(--text);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .job-item:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    /* ===== 页脚 ===== */
+    footer {
+      background: #1f1235;
+      color: #a78bca;
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    footer .heart {
+      color: #f43f5e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 导航栏 -->
+  <nav class="navbar">
+    <div class="logo">
+      <span class="icon">⌘</span>
+      SE 专业导航
+    </div>
+    <ul class="nav-links">
+      <li><a href="#intro">专业简介</a></li>
+      <li><a href="#courses">核心课程</a></li>
+      <li><a href="#directions">深造方向</a></li>
+      <li><a href="#jobs">就业前景</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <h1>软件工程</h1>
+    <div class="en">Software Engineering</div>
+    <p>
+      以工程化方法研究软件的开发、运行与维护，注重需求分析、系统设计、
+      质量保证与项目管理，培养高素质的软件研发与工程管理人才。
+    </p>
+    <div class="badges">
+      <span class="badge">📋 需求分析</span>
+      <span class="badge">🏗️ 系统设计</span>
+      <span class="badge">💻 软件开发</span>
+      <span class="badge">🧪 软件测试</span>
+      <span class="badge">🚀 DevOps</span>
+    </div>
+  </header>
+
+  <!-- 专业简介 -->
+  <section id="intro">
+    <div class="container">
+      <h2 class="section-title">专业简介</h2>
+      <p class="section-subtitle">软件工程是研究用工程化方法构建和维护有效、实用、高质量软件的学科。</p>
+      <div class="intro-grid">
+        <div class="intro-text">
+          <p>
+            软件工程（Software Engineering）是研究如何以系统性、规范化、可定量的过程化方法
+            开发和维护软件，以及如何将经过时间考验且证明有效的管理技术与工程技术相结合的学科。
+          </p>
+          <p>
+            它既关注<strong>软件开发技术</strong>（如编程语言、框架、数据库、架构设计），
+            也关注<strong>软件过程管理</strong>（如需求工程、项目管理、质量保证、配置管理），
+            还强调<strong>工程实践能力</strong>（如团队协作、敏捷开发、持续集成与交付）。
+          </p>
+          <p>
+            相比计算机科学与技术，软件工程更侧重软件生命周期全过程和工程化管理，
+            毕业生既可以从事软件开发、测试、运维等工作，也可以继续深造从事软件工程研究。
+          </p>
+        </div>
+        <div class="intro-stats">
+          <div class="stat-card">
+            <div class="num">4 年</div>
+            <div class="label">本科学制</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">工学</div>
+            <div class="label">授予学位</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">40+</div>
+            <div class="label">核心课程门数</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">8+</div>
+            <div class="label">深造研究方向</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 核心课程 -->
+  <section id="courses">
+    <div class="container">
+      <h2 class="section-title">核心课程</h2>
+      <p class="section-subtitle">软件工程专业既要打好编程基础，也要掌握工程化开发方法。</p>
+      <div class="cards-grid">
+        <div class="course-card">
+          <div class="emoji">💻</div>
+          <h3>编程基础</h3>
+          <ul>
+            <li>程序设计基础</li>
+            <li>面向对象编程</li>
+            <li>数据结构</li>
+            <li>算法设计与分析</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">📋</div>
+          <h3>需求与设计</h3>
+          <ul>
+            <li>软件工程导论</li>
+            <li>需求工程</li>
+            <li>软件体系结构</li>
+            <li>设计模式</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">🧪</div>
+          <h3>测试与质量</h3>
+          <ul>
+            <li>软件测试</li>
+            <li>软件质量保证</li>
+            <li>形式化方法</li>
+            <li>软件度量</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">🗄️</div>
+          <h3>数据与系统</h3>
+          <ul>
+            <li>数据库系统</li>
+            <li>操作系统</li>
+            <li>计算机网络</li>
+            <li>分布式系统</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">🚀</div>
+          <h3>开发与运维</h3>
+          <ul>
+            <li>Web 开发技术</li>
+            <li>移动应用开发</li>
+            <li>DevOps 与 CI/CD</li>
+            <li>容器与云计算</li>
+          </ul>
+        </div>
+        <div class="course-card">
+          <div class="emoji">👥</div>
+          <h3>管理与工程</h3>
+          <ul>
+            <li>软件项目管理</li>
+            <li>敏捷开发</li>
+            <li>人机交互</li>
+            <li>团队协作与沟通</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 深造方向 -->
+  <section id="directions" class="directions">
+    <div class="container">
+      <h2 class="section-title">深造方向</h2>
+      <p class="section-subtitle">
+        软件工程专业本科毕业后可继续攻读硕士 / 博士研究生，以下为主要研究与深造方向。
+      </p>
+
+      <div class="direction-card">
+        <h3>🏗️ 软件架构与设计</h3>
+        <p class="desc">
+          研究大型软件系统的架构设计方法，包括微服务架构、云原生架构、架构评估与演化等。
+        </p>
+        <div class="tags">
+          <span class="tag">微服务</span>
+          <span class="tag">云原生</span>
+          <span class="tag">架构评估</span>
+          <span class="tag">设计模式</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>🧪 软件测试与质量保证</h3>
+        <p class="desc">
+          研究软件测试技术、自动化测试、缺陷预测、软件可靠性分析与质量保障方法。
+        </p>
+        <div class="tags">
+          <span class="tag">自动化测试</span>
+          <span class="tag">缺陷预测</span>
+          <span class="tag">可靠性分析</span>
+          <span class="tag">质量度量</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>🤖 智能化软件开发</h3>
+        <p class="desc">
+          将人工智能与软件工程结合，研究智能代码生成、程序分析、代码推荐与自动修复等技术。
+        </p>
+        <div class="tags">
+          <span class="tag">代码生成</span>
+          <span class="tag">程序分析</span>
+          <span class="tag">自动修复</span>
+          <span class="tag">大模型应用</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>🔒 软件安全与可信计算</h3>
+        <p class="desc">
+          研究软件漏洞分析、恶意代码检测、可信软件构造与安全开发生命周期等方向。
+        </p>
+        <div class="tags">
+          <span class="tag">漏洞分析</span>
+          <span class="tag">安全开发</span>
+          <span class="tag">可信计算</span>
+          <span class="tag">隐私保护</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>📊 数据驱动的软件工程</h3>
+        <p class="desc">
+          利用大数据与机器学习技术分析软件开发过程数据，辅助需求决策、项目管理与质量预测。
+        </p>
+        <div class="tags">
+          <span class="tag">软件数据分析</span>
+          <span class="tag">挖掘软件仓库</span>
+          <span class="tag">过程改进</span>
+          <span class="tag">经验软件工程</span>
+        </div>
+      </div>
+
+      <div class="direction-card">
+        <h3>🌐 软件工程与新兴技术</h3>
+        <p class="desc">
+          研究面向物联网、区块链、边缘计算、元宇宙等新兴领域的软件工程方法与工具。
+        </p>
+        <div class="tags">
+          <span class="tag">物联网软件</span>
+          <span class="tag">区块链应用</span>
+          <span class="tag">边缘计算</span>
+          <span class="tag">虚拟现实</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 深造路径 -->
+  <section id="path">
+    <div class="container">
+      <h2 class="section-title">深造路径规划</h2>
+      <p class="section-subtitle">从本科到研究生的常见成长路线。</p>
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="step-num">1</div>
+          <h3>夯实编程基础</h3>
+          <p>熟练掌握一门编程语言，学好数据结构、数据库、操作系统等核心课程。</p>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">2</div>
+          <h3>掌握工程方法</h3>
+          <p>系统学习软件工程、设计模式、测试与项目管理，参与团队项目实践。</p>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">3</div>
+          <h3>科研与实习</h3>
+          <p>参与导师课题、开源项目或企业实习，积累科研与工程经验。</p>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">4</div>
+          <h3>升学深造</h3>
+          <p>通过保研、考研或出国留学，进入理想的硕士 / 博士项目。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 就业前景 -->
+  <section id="jobs">
+    <div class="container">
+      <h2 class="section-title">就业前景</h2>
+      <p class="section-subtitle">软件工程专业就业面广，软件行业需求持续旺盛，可从事以下岗位。</p>
+      <div class="job-grid">
+        <div class="job-item">软件开发工程师</div>
+        <div class="job-item">软件测试工程师</div>
+        <div class="job-item">系统架构师</div>
+        <div class="job-item">产品经理</div>
+        <div class="job-item">项目经理</div>
+        <div class="job-item">DevOps 工程师</div>
+        <div class="job-item">前端开发工程师</div>
+        <div class="job-item">后端开发工程师</div>
+        <div class="job-item">数据库管理员</div>
+        <div class="job-item">软件咨询顾问</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer>
+    <p>软件工程专业 · 介绍与深造方向</p>
+    <p style="margin-top: 0.5rem;">用心编写 <span class="heart">♥</span> 为每一位 SE 学子加油</p>
+  </footer>
+
+</body>
+</html>

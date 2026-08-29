@@ -123,6 +123,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nju-agent", description="A local programming-agent scaffold.")
     parser.add_argument("--version", action="version", version="nju-agent 0.6.0")
     parser.add_argument("--resume", metavar="SESSION", help="Resume a saved session by full or short ID.")
+    parser.add_argument("--web", action="store_true", help="Start the local browser interface instead of the terminal interface.")
+    parser.add_argument("--host", default="127.0.0.1", help="Host for web mode (default: 127.0.0.1).")
+    parser.add_argument("--port", type=int, default=8765, help="Port for web mode (default: 8765).")
     return parser
 
 
@@ -256,6 +259,13 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigurationError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
+    if getattr(args, "web", False):
+        from .web import serve
+        if not settings.api_key or not settings.model:
+            print("Configuration error: web mode requires NJU_AGENT_API_KEY and NJU_AGENT_MODEL", file=sys.stderr)
+            return 2
+        serve(settings.workspace, host=args.host, port=args.port, api_key=settings.api_key, base_url=settings.base_url, model=settings.model)
+        return 0
     return run_interactive(settings, resume_id=args.resume)
 
 

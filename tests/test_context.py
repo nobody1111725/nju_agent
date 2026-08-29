@@ -136,6 +136,14 @@ class ContextAndPlanTests(unittest.TestCase):
             self.assertEqual(agent.last_messages[1]["content"], "读取文件")
             self.assertEqual(agent.last_messages[-1]["content"], "完成")
 
+    def test_web_arguments_are_available_from_cli(self) -> None:
+        from nju_agent.cli import build_parser
+
+        args = build_parser().parse_args(["--web", "--host", "0.0.0.0", "--port", "9000"])
+        self.assertTrue(args.web)
+        self.assertEqual(args.host, "0.0.0.0")
+        self.assertEqual(args.port, 9000)
+
 
 if __name__ == "__main__":
     unittest.main()

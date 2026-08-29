@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>南京大学软件学院 · 学院介绍</title>
+  <style>
+    :root {
+      --nju-blue: #0f4c81;
+      --nju-purple: #5b2c83;
+      --nju-gold: #c9a063;
+      --tech-cyan: #0e7490;
+      --bg: #f7f8fa;
+      --card-bg: #ffffff;
+      --text: #1f2d3d;
+      --text-light: #5e6b7a;
+      --border: #e3e8ee;
+      --gradient: linear-gradient(135deg, #0f4c81 0%, #0e7490 55%, #5b2c83 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    /* ===== 顶部横幅 ===== */
+    .hero {
+      position: relative;
+      min-height: 90vh;
+      background: var(--gradient);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 4rem 2rem;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.14), transparent 38%),
+        radial-gradient(circle at 78% 72%, rgba(201, 160, 99, 0.28), transparent 45%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      position: relative;
+      display: inline-block;
+      padding: 0.4rem 1.2rem;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 999px;
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      margin-bottom: 2rem;
+    }
+
+    .hero h1 {
+      position: relative;
+      font-size: clamp(2.8rem, 7vw, 5rem);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      margin-bottom: 1rem;
+    }
+
+    .hero .en-name {
+      position: relative;
+      font-size: 1.1rem;
+      letter-spacing: 0.3em;
+      opacity: 0.92;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+    }
+
+    .hero .slogan {
+      position: relative;
+      font-size: clamp(1.15rem, 2.5vw, 1.7rem);
+      font-weight: 300;
+      letter-spacing: 0.18em;
+      margin-bottom: 2.5rem;
+      color: #eaf4f8;
+    }
+
+    .hero .location {
+      position: relative;
+      font-size: 1rem;
+      opacity: 0.88;
+      letter-spacing: 0.08em;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5rem;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translate(-50%, 0); }
+      50% { transform: translate(-50%, 10px); }
+    }
+
+    /* ===== 导航栏 ===== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .navbar .logo {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--nju-blue);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar .logo .icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text-light);
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--nju-blue);
+    }
+
+    /* ===== 通用区块 ===== */
+    .section {
+      padding: 5rem 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .section-title h2 {
+      font-size: 2.2rem;
+      color: var(--nju-blue);
+      margin-bottom: 0.5rem;
+    }
+
+    .section-title p {
+      color: var(--text-light);
+    }
+
+    .section-title::after {
+      content: "";
+      display: block;
+      width: 64px;
+      height: 4px;
+      margin: 1rem auto 0;
+      background: var(--gradient);
+      border-radius: 2px;
+    }
+
+    /* ===== 概览卡片 ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 28px rgba(15, 76, 129, 0.12);
+    }
+
+    .stat-card .number {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--nju-blue);
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-card .label {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    /* ===== 学院沿革时间线 ===== */
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(var(--nju-blue), var(--nju-gold));
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 2rem;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -1.75rem;
+      top: 2rem;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--nju-blue);
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 3px var(--nju-blue);
+    }
+
+    .timeline-item .year {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--nju-blue);
+    }
+
+    .timeline-item p {
+      color: var(--text-light);
+      margin-top: 0.3rem;
+    }
+
+    /* ===== 学科方向 ===== */
+    .direction-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .direction-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: transform 0.25s;
+    }
+
+    .direction-card:hover {
+      transform: translateY(-6px);
+      border-color: var(--tech-cyan);
+    }
+
+    .direction-card h3 {
+      color: var(--nju-blue);
+      margin-bottom: 0.5rem;
+      font-size: 1.25rem;
+    }
+
+    .direction-card p {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    /* ===== 培养特色 ===== */
+    .feature-list {
+      list-style: none;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .feature-list .dot {
+      flex-shrink: 0;
+      width: 10px;
+      height: 10px;
+      margin-top: 0.6rem;
+      border-radius: 50%;
+      background: var(--nju-gold);
+    }
+
+    .feature-list strong {
+      color: var(--nju-blue);
+    }
+
+    .feature-list p {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    /* ===== 联系方式 ===== */
+    .contact-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-light);
+    }
+
+    .contact-box strong {
+      color: var(--text);
+    }
+
+    /* ===== 页脚 ===== */
+    footer {
+      background: #14202e;
+      color: #b8c4d0;
+      text-align: center;
+      padding: 3rem 2rem;
+      margin-top: 3rem;
+    }
+
+    footer .motto-big {
+      color: #e8e2d4;
+      font-size: 1.1rem;
+      letter-spacing: 0.3em;
+      margin-bottom: 0.8rem;
+    }
+
+    footer small {
+      display: block;
+      margin-top: 1rem;
+      opacity: 0.7;
+    }
+
+    @media (max-width: 640px) {
+      .nav-links {
+        gap: 0.8rem;
+      }
+      .nav-links a {
+        font-size: 0.8rem;
+      }
+      .section {
+        padding: 3rem 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部横幅 -->
+  <header class="hero">
+    <div class="hero-badge">南京大学 · 国家示范性软件学院</div>
+    <h1>软件学院</h1>
+    <div class="en-name">Software Institute · Nanjing University</div>
+    <p class="slogan">务实创新 · 追求卓越</p>
+    <p class="location">南京大学仙林校区 · 南京市栖霞区仙林大道 163 号</p>
+    <div class="scroll-hint">⌄</div>
+  </header>
+
+  <!-- 导航栏 -->
+  <nav class="navbar">
+    <div class="logo">
+      <span class="icon">软</span>
+      <span>南京大学软件学院</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#overview">学院概况</a></li>
+      <li><a href="#history">发展历程</a></li>
+      <li><a href="#directions">学科方向</a></li>
+      <li><a href="#education">人才培养</a></li>
+      <li><a href="#contact">联系方式</a></li>
+    </ul>
+  </nav>
+
+  <!-- 学院概况 -->
+  <section class="section" id="overview">
+    <div class="section-title">
+      <h2>学院概况</h2>
+      <p>立足软件工程学科，培养高水平、国际化、创新型软件人才</p>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="number">2001</div>
+        <div class="label">学院成立年份</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">首批</div>
+        <div class="label">国家示范性软件学院</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">本硕博</div>
+        <div class="label">完整人才培养体系</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">A 类</div>
+        <div class="label">软件工程学科水平</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 发展历程 -->
+  <section class="section" id="history">
+    <div class="section-title">
+      <h2>发展历程</h2>
+      <p>依托南京大学深厚学科底蕴，走工程化、国际化发展之路</p>
+    </div>
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="year">2001 年</div>
+        <p>南京大学软件学院成立，成为首批国家示范性软件学院之一，面向国家软件产业发展需求培养高层次人才。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">学科建设</div>
+        <p>建成软件工程本科、硕士、博士完整培养体系，软件工程学科进入国内前列，并获评 A 类学科。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">工程教育</div>
+        <p>入选教育部卓越工程师教育培养计划，强化校企协同与工程实践，形成鲜明的工程化教学特色。</p>
+      </div>
+      <div class="timeline-item">
+        <div class="year">国际合作</div>
+        <p>与多所国际知名高校和企业建立合作，推进联合培养、学术交流与科研合作，人才培养国际化程度不断提升。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 学科方向 -->
+  <section class="section" id="directions">
+    <div class="section-title">
+      <h2>学科方向</h2>
+      <p>面向国家战略与产业前沿，聚焦软件工程核心领域</p>
+    </div>
+    <div class="direction-grid">
+      <div class="direction-card">
+        <h3>软件工程理论与方法</h3>
+        <p>研究软件过程、软件体系结构、软件质量保障、形式化方法等基础理论与方法。</p>
+      </div>
+      <div class="direction-card">
+        <h3>智能软件与人工智能</h3>
+        <p>面向智能化软件系统，开展机器学习、智能软件工程、自然语言处理等相关研究与教学。</p>
+      </div>
+      <div class="direction-card">
+        <h3>大数据与云计算</h3>
+        <p>围绕海量数据管理与分析、分布式计算、云原生系统等方向培养工程实践能力。</p>
+      </div>
+      <div class="direction-card">
+        <h3>网络与信息安全</h3>
+        <p>关注软件安全、系统安全、数据安全与隐私保护，服务国家网络安全需求。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 人才培养 -->
+  <section class="section" id="education">
+    <div class="section-title">
+      <h2>人才培养</h2>
+      <p>项目驱动、校企协同、国际视野，全面提升学生工程与创新能力</p>
+    </div>
+    <ul class="feature-list">
+      <li>
+        <span class="dot"></span>
+        <div><strong>工程化教学：</strong><p>以项目为主线组织课程，学生在真实项目环境中完成需求分析、设计、编码、测试与运维全过程训练。</p></div>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <div><strong>校企协同育人：</strong><p>与知名软件企业共建实习实训基地，邀请产业导师参与教学，推动人才培养与产业需求对接。</p></div>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <div><strong>创新实践平台：</strong><p>支持学生参与创新创业训练、学科竞赛与科研项目，培养解决复杂软件工程问题的能力。</p></div>
+      </li>
+      <li>
+        <span class="dot"></span>
+        <div><strong>国际化培养：</strong><p>开展国际课程、联合培养与海外交流项目，拓展学生国际视野与跨文化交流能力。</p></div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 联系方式 -->
+  <section class="section" id="contact">
+    <div class="section-title">
+      <h2>联系方式</h2>
+      <p>欢迎了解南京大学软件学院</p>
+    </div>
+    <div class="contact-box">
+      <p><strong>地址：</strong>江苏省南京市栖霞区仙林大道 163 号 · 南京大学软件学院</p>
+      <p><strong>邮编：</strong>210023</p>
+      <p>具体招生与联系方式请以南京大学及软件学院官方网站发布为准。</p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="motto-big">诚朴雄伟 · 励学敦行</div>
+    <div>南京大学软件学院 · Software Institute, Nanjing University</div>
+    <small>本页面为介绍性展示页面，相关信息仅供参考。</small>
+  </footer>
+
+</body>
+</html>

@@ -15,3 +15,6 @@ nju-agent = "nju_agent.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["nju_agent*"]
+
+[tool.setuptools.package-data]
+nju_agent = ["web/*.html", "web/*.css", "web/*.js"]

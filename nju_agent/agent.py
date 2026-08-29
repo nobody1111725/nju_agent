@@ -17,6 +17,7 @@ class ModelClient(Protocol):
 
 
 ToolObserver = Callable[[str, Any, str | None], None]
+ModelResponseObserver = Callable[[], None]
 
 
 class AgentError(RuntimeError):
@@ -24,7 +25,7 @@ class AgentError(RuntimeError):
 
 
 class Agent:
-    def __init__(self, client: ModelClient, tools: LocalTools, *, max_steps: int = 20, max_repeated_errors: int = 3, max_context_chars: int = 24_000, logger: logging.Logger | None = None, on_tool_start: Callable[[str, Any], None] | None = None, on_tool_end: ToolObserver | None = None) -> None:
+    def __init__(self, client: ModelClient, tools: LocalTools, *, max_steps: int = 20, max_repeated_errors: int = 3, max_context_chars: int = 24_000, logger: logging.Logger | None = None, on_tool_start: Callable[[str, Any], None] | None = None, on_tool_end: ToolObserver | None = None, on_model_response: ModelResponseObserver | None = None) -> None:
         self.client = client
         self.tools = tools
         self.max_steps = max_steps
@@ -32,6 +33,7 @@ class Agent:
         self.logger = logger or logging.getLogger(__name__)
         self.on_tool_start = on_tool_start
         self.on_tool_end = on_tool_end
+        self.on_model_response = on_model_response
         self.context = ContextManager(max_chars=max_context_chars)
         self.plan: TaskPlan = tools.plan
         self.last_messages: list[dict[str, Any]] = []
@@ -74,6 +76,9 @@ class Agent:
             tool_calls = message.get("tool_calls") or []
             if not isinstance(tool_calls, list):
                 raise AgentError("Model returned invalid tool_calls")
+            if self.on_model_response:
+                # Notify only after a usable model response arrives.
+                self.on_model_response()
             content = message.get("content") or ""
             if not tool_calls:
                 if not isinstance(content, str) or not content.strip():
