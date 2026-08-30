@@ -93,11 +93,13 @@ class ContextAndPlanTests(unittest.TestCase):
             session = store.create()
             session.messages = [{"role": "user", "content": "继续修复"}]
             session.plan = {"steps": ["修复"], "current_step": 1}
+            session.tool_runs = [{"id": "run-1", "task": "继续修复", "events": [{"name": "read_file", "label": "read_file: path=main.py, lines=1-end", "status": "done"}]}]
             store.save(session)
             loaded = store.load(session.short_id)
             self.assertIsNotNone(loaded)
             self.assertEqual(loaded.id, session.id)
             self.assertEqual(loaded.messages[0]["content"], "继续修复")
+            self.assertEqual(loaded.tool_runs[0]["id"], "run-1")
             self.assertEqual(store.list()[0].id, session.id)
 
     def test_agent_appends_final_answer_to_resumed_history(self) -> None:

@@ -12,7 +12,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from .agent import Agent, AgentError
 from .cli import TerminalToolDisplay
@@ -40,15 +40,22 @@ def _json_bytes(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False).encode("utf-8")
 
 
-def _chat_messages(session: Session) -> list[dict[str, str]]:
-    return [
-        {"role": str(item["role"]), "content": str(item["content"])}
-        for item in session.messages
-        if isinstance(item, dict)
-        if item.get("role") in {"user", "assistant"}
-        and isinstance(item.get("content"), str)
-        and item.get("content", "").strip()
-    ]
+def _chat_messages(session: Session) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+    for item in session.messages:
+        if not isinstance(item, dict) or item.get("role") not in {"user", "assistant"} or not isinstance(item.get("content"), str) or not item["content"].strip():
+            continue
+        message: dict[str, Any] = {"role": str(item["role"]), "content": str(item["content"])}
+        if item["role"] == "user" and isinstance(item.get("attachments"), list):
+            attachments = []
+            for attachment in item["attachments"]:
+                if not isinstance(attachment, dict) or not isinstance(attachment.get("name"), str) or not isinstance(attachment.get("size"), int):
+                    continue
+                attachments.append({"name": attachment["name"], "size": attachment["size"]})
+            if attachments:
+                message["attachments"] = attachments
+        messages.append(message)
+    return messages
 
 
 class AgentWebHandler(BaseHTTPRequestHandler):
@@ -58,6 +65,9 @@ class AgentWebHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/sessions":
             self._sessions()
+            return
+        if parsed.path == "/api/modified-file":
+            self._modified_file(parse_qs(parsed.query))
             return
         if parsed.path.startswith("/api/sessions/"):
             self._session(unquote(parsed.path.rsplit("/", 1)[-1]))
@@ -76,6 +86,9 @@ class AgentWebHandler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if parsed.path == "/api/uploads":
+            self._delete_upload(parse_qs(parsed.query))
+            return
         if parsed.path.startswith("/api/sessions/"):
             self._delete_session(unquote(parsed.path.rsplit("/", 1)[-1]))
             return
@@ -126,6 +139,22 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             return
         self._json_response({"name": name, "path": relative.as_posix(), "size": len(content)}, 201)
 
+    def _delete_upload(self, query: dict[str, list[str]]) -> None:
+        value = query.get("path", [""])[0]
+        try:
+            paths = self._attachment_paths([value])
+            target = (self.server.workspace / paths[0]).resolve()
+            parent = target.parent
+            target.unlink()
+            try:
+                parent.rmdir()
+            except OSError:
+                pass
+        except (OSError, ValueError) as exc:
+            self._json_response({"error": str(exc)}, 400)
+            return
+        self._json_response({"deleted": True, "path": value})
+
     def _sessions(self) -> None:
         try:
             sessions = self.server.store.list()
@@ -142,7 +171,59 @@ class AgentWebHandler(BaseHTTPRequestHandler):
         if session is None:
             self._json_response({"error": "Session not found"}, 404)
             return
-        self._json_response({"id": session.id, "short_id": session.short_id, "updated_at": session.updated_at, "messages": _chat_messages(session)})
+        self._json_response({"id": session.id, "short_id": session.short_id, "updated_at": session.updated_at, "messages": _chat_messages(session), "tool_runs": session.tool_runs})
+
+    def _modified_file(self, query: dict[str, list[str]]) -> None:
+        session_id = query.get("session_id", [""])[0]
+        relative_path = query.get("path", [""])[0]
+        if not session_id or not relative_path:
+            self._json_response({"error": "session_id and path are required"}, 400)
+            return
+        try:
+            session = self.server.store.load(session_id)
+        except SessionError as exc:
+            self._json_response({"error": str(exc)}, 500)
+            return
+        if session is None:
+            self._json_response({"error": "Session not found"}, 404)
+            return
+        try:
+            target = (self.server.workspace / relative_path).resolve()
+            if target == self.server.workspace or self.server.workspace not in target.parents:
+                raise ValueError("Requested path is outside the workspace")
+            modified_paths = self._modified_paths(session)
+            if target not in modified_paths:
+                raise ValueError("File was not modified in this session")
+            if not target.is_file():
+                raise ValueError("Modified file no longer exists")
+            if target.stat().st_size > MAX_ATTACHMENT_BYTES:
+                raise ValueError("Modified file is too large to open in the browser")
+            content = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            self._json_response({"error": str(exc)}, 400)
+            return
+        body = content.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _modified_paths(self, session: Session) -> set[Path]:
+        paths: set[Path] = set()
+        for run in session.tool_runs:
+            if not isinstance(run, dict) or not isinstance(run.get("events"), list):
+                continue
+            for event in run["events"]:
+                diff = event.get("diff") if isinstance(event, dict) else None
+                path = diff.get("path") if isinstance(diff, dict) else None
+                if not isinstance(path, str):
+                    continue
+                target = (self.server.workspace / path).resolve()
+                if target != self.server.workspace and self.server.workspace in target.parents:
+                    paths.add(target)
+        return paths
 
     def _delete_session(self, session_id: str) -> None:
         if not session_id:
@@ -164,6 +245,7 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             task = payload.get("task", "")
             requested_id = payload.get("session_id")
             attachment_paths = self._attachment_paths(payload.get("attachments", []))
+            attachments = self._attachment_metadata(attachment_paths)
             if not isinstance(task, str) or not task.strip():
                 raise ValueError("task must be a non-empty string")
             if requested_id is not None and not isinstance(requested_id, str):
@@ -171,7 +253,7 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             session = self.server.store.load(requested_id) if requested_id else None
             if requested_id and session is None:
                 raise ValueError("session not found")
-        except (ValueError, json.JSONDecodeError, SessionError) as exc:
+        except (OSError, ValueError, json.JSONDecodeError, SessionError) as exc:
             self._json_response({"error": str(exc)}, 400)
             return
 
@@ -181,6 +263,19 @@ class AgentWebHandler(BaseHTTPRequestHandler):
         events: queue.Queue[dict[str, Any]] = queue.Queue()
         finished = threading.Event()
         result: dict[str, Any] = {}
+        tool_events: list[dict[str, Any]] = []
+        run_id = uuid.uuid4().hex
+        previous_visible_message_count = len(_chat_messages(session))
+
+        def record_tool_run() -> None:
+            if any(item.get("id") == run_id for item in session.tool_runs if isinstance(item, dict)):
+                return
+            visible_messages = _chat_messages(session)
+            assistant_message_index = next(
+                (index for index in range(previous_visible_message_count, len(visible_messages)) if visible_messages[index]["role"] == "assistant"),
+                None,
+            )
+            session.tool_runs.append({"id": run_id, "task": task, "events": tool_events, "assistant_message_index": assistant_message_index})
 
         def on_start(name: str, arguments: Any) -> None:
             events.put({"event": "tool_start", "name": name, "label": TerminalToolDisplay._label(name, arguments)})
@@ -190,6 +285,7 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             event: dict[str, Any] = {"event": "tool_end", "name": name, "label": TerminalToolDisplay._label(name, arguments), "status": "done" if success else "failed"}
             if success and local_tools.last_diff is not None and name in {"write_file", "edit_file"}:
                 event["diff"] = local_tools.last_diff
+            tool_events.append({key: value for key, value in event.items() if key != "event"})
             events.put(event)
 
         def on_model_response() -> None:
@@ -203,19 +299,21 @@ class AgentWebHandler(BaseHTTPRequestHandler):
                     agent.plan.restore(session.plan)
                 agent_task = self._task_with_attachments(task, attachment_paths)
                 answer = agent.run(agent_task, history=session.messages if session.messages else None, resume=bool(session.messages))
-                session.messages = self._persisted_messages(agent.last_messages, agent_task, task)
+                session.messages = self._persisted_messages(agent.last_messages, agent_task, task, attachments)
                 session.plan = agent.plan.snapshot()
+                record_tool_run()
                 self.server.store.save(session)
-                result.update({"id": session.id, "short_id": session.short_id, "answer": answer, "messages": _chat_messages(session)})
+                result.update({"id": session.id, "short_id": session.short_id, "answer": answer, "messages": _chat_messages(session), "tool_runs": session.tool_runs})
             except (AgentError, ModelError, SessionError) as exc:
                 # A new session should remain recoverable even if the first
                 # model call cannot leave this machine.
                 if agent is not None and agent.last_messages:
-                    session.messages = self._persisted_messages(agent.last_messages, self._task_with_attachments(task, attachment_paths), task)
+                    session.messages = self._persisted_messages(agent.last_messages, self._task_with_attachments(task, attachment_paths), task, attachments)
                     session.plan = agent.plan.snapshot()
+                record_tool_run()
                 try:
                     self.server.store.save(session)
-                    result.update({"id": session.id, "short_id": session.short_id, "messages": _chat_messages(session)})
+                    result.update({"id": session.id, "short_id": session.short_id, "messages": _chat_messages(session), "tool_runs": session.tool_runs})
                 except SessionError as save_error:
                     result["save_error"] = str(save_error)
                 result["error"] = str(exc)
@@ -258,6 +356,12 @@ class AgentWebHandler(BaseHTTPRequestHandler):
                 paths.append(relative)
         return paths
 
+    def _attachment_metadata(self, paths: list[str]) -> list[dict[str, Any]]:
+        return [
+            {"name": Path(path).name, "size": (self.server.workspace / path).stat().st_size}
+            for path in paths
+        ]
+
     @staticmethod
     def _task_with_attachments(task: str, paths: list[str]) -> str:
         if not paths:
@@ -266,12 +370,14 @@ class AgentWebHandler(BaseHTTPRequestHandler):
         return f"{task}\n\n附件已保存到本地工作区。需要时请先使用 read_file 查看：\n{listed}"
 
     @staticmethod
-    def _persisted_messages(messages: list[dict[str, Any]], agent_task: str, task: str) -> list[dict[str, Any]]:
+    def _persisted_messages(messages: list[dict[str, Any]], agent_task: str, task: str, attachments: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Keep attachment instructions out of the chat transcript shown to users."""
         persisted = [dict(message) for message in messages]
         for message in reversed(persisted):
             if message.get("role") == "user" and message.get("content") == agent_task:
                 message["content"] = task
+                if attachments:
+                    message["attachments"] = attachments
                 break
         return persisted
 

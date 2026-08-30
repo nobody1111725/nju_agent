@@ -1,6 +1,6 @@
 const MAX_ATTACHMENTS_PER_TURN = 10;
 const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
-const state = { sessionId: null, sending: false, uploading: false, messages: [], attachments: [] };
+const state = { sessionId: null, sending: false, uploading: false, messages: [], attachments: [], toolRuns: [] };
 const $ = (id) => document.getElementById(id);
 const messages = $("messages");
 const prompt = $("prompt");
@@ -43,8 +43,39 @@ function markdownToHtml(value) {
   flushParagraph(); flushList(); return output.join("");
 }
 function renderMessages(items) {
-  messages.innerHTML = items.length ? items.map((item) => `<article class="message ${item.role}"><div class="avatar ${item.role}">${item.role === "user" ? "你" : "N"}</div><div class="message-body">${item.role === "assistant" ? markdownToHtml(item.content) : escapeHtml(item.content)}</div></article>`).join("") : `<div class="empty-state"><div class="empty-mark">N</div><h1>开始编程工作</h1><p>描述要修改、检查或运行的代码任务。</p></div>`;
+  const indexedRuns = new Map();
+  const legacyRuns = [];
+  (Array.isArray(state.toolRuns) ? state.toolRuns : []).forEach((run) => {
+    if (run && Object.prototype.hasOwnProperty.call(run, "assistant_message_index")) {
+      if (Number.isInteger(run.assistant_message_index)) indexedRuns.set(run.assistant_message_index, run);
+    } else legacyRuns.push(run);
+  });
+  let completedTurn = 0;
+  messages.innerHTML = items.length ? items.map((item, messageIndex) => {
+    let toolRun = "";
+    if (item.role === "assistant") {
+      toolRun = renderToolRun(indexedRuns.get(messageIndex) || legacyRuns[completedTurn], completedTurn);
+      completedTurn += 1;
+    }
+    const attachments = item.role === "user" ? renderMessageAttachments(item.attachments) : "";
+    return `<article class="message ${item.role}"><div class="avatar ${item.role}">${item.role === "user" ? "你" : "N"}</div><div class="message-content"><div class="message-body">${item.role === "assistant" ? markdownToHtml(item.content) : escapeHtml(item.content)}</div>${attachments}${toolRun}</div></article>`;
+  }).join("") : `<div class="empty-state"><div class="empty-mark">N</div><h1>开始编程工作</h1><p>描述要修改、检查或运行的代码任务。</p></div>`;
+  if (state.sending) {
+    const currentTurn = messages.querySelector(".message.user:last-of-type .message-content");
+    if (currentTurn) {
+      const rail = document.createElement("div");
+      rail.id = "toolRail";
+      rail.className = "tool-rail";
+      currentTurn.appendChild(rail);
+    }
+  }
+  messages.querySelectorAll("details[data-run-id]").forEach((detail) => detail.addEventListener("toggle", () => saveToolRunOpen(detail.dataset.runId, detail.open)));
   messages.scrollTop = messages.scrollHeight;
+}
+function renderMessageAttachments(attachments) {
+  const values = Array.isArray(attachments) ? attachments.filter((item) => item && typeof item.name === "string" && Number.isFinite(item.size)) : [];
+  if (!values.length) return "";
+  return `<div class="message-attachments">${values.map((item) => `<span class="message-attachment" title="${escapeHtml(item.name)}">${escapeHtml(item.name)} <small>${formatBytes(item.size)}</small></span>`).join("")}</div>`;
 }
 function setThinking(visible) {
   const rail = $("toolRail");
@@ -69,6 +100,32 @@ function renderDiff(diff) {
   }).join("");
   return `<details class="diff-view" open><summary>${escapeHtml(summary)}</summary><div class="diff-lines">${lines}</div></details>`;
 }
+function toolRunStorageKey(runId) { return `nju-agent:tool-run:${state.sessionId || "new"}:${runId}`; }
+function getToolRunOpen(runId) {
+  try { return localStorage.getItem(toolRunStorageKey(runId)) !== "collapsed"; } catch (_) { return true; }
+}
+function saveToolRunOpen(runId, open) {
+  try { localStorage.setItem(toolRunStorageKey(runId), open ? "open" : "collapsed"); } catch (_) { /* Browser storage can be disabled. */ }
+}
+function renderToolRun(run, index) {
+  if (!run || typeof run !== "object") return "";
+  const id = typeof run.id === "string" ? run.id : `legacy-${index}`;
+  const events = Array.isArray(run.events) ? run.events : [];
+  if (!events.length) return "";
+  const details = events.map((event) => `<div class="tool-history-event ${escapeHtml(event.status || "failed")}"><span>${event.status === "done" ? "✓" : "×"}  ${escapeHtml(event.label || event.name || "工具调用")}</span>${renderDiff(event.diff) || ""}</div>`).join("");
+  return `<details class="tool-run" data-run-id="${escapeHtml(id)}"${getToolRunOpen(id) ? " open" : ""}><summary>运行指令 <small>${events.length} 项</small></summary><div class="tool-history-events">${details}</div></details>`;
+}
+function renderModifiedFiles() {
+  const panel = $("modifiedFilesPanel");
+  const list = $("modifiedFiles");
+  const files = new Map();
+  (Array.isArray(state.toolRuns) ? state.toolRuns : []).forEach((run) => (Array.isArray(run?.events) ? run.events : []).forEach((event) => {
+    const path = event?.diff?.path;
+    if (typeof path === "string" && path.trim()) files.set(path, (files.get(path) || 0) + 1);
+  }));
+  panel.hidden = files.size === 0 || !state.sessionId;
+  list.innerHTML = [...files.entries()].map(([path, count]) => `<a class="modified-file" href="/api/modified-file?session_id=${encodeURIComponent(state.sessionId)}&path=${encodeURIComponent(path)}" target="_blank" rel="noreferrer" title="打开 ${escapeHtml(path)}"><span>${escapeHtml(path)}</span><small>${count} 次</small></a>`).join("");
+}
 async function loadSessions() {
   const response = await fetch("/api/sessions");
   const data = await response.json();
@@ -80,9 +137,9 @@ async function loadSessions() {
 async function openSession(id) {
   const response = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
   if (!response.ok) return;
-  const data = await response.json(); state.sessionId = data.id; state.messages = Array.isArray(data.messages) ? data.messages : []; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已恢复会话"; renderMessages(state.messages); await loadSessions();
+  const data = await response.json(); state.sessionId = data.id; state.messages = Array.isArray(data.messages) ? data.messages : []; state.toolRuns = Array.isArray(data.tool_runs) ? data.tool_runs : []; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已恢复会话"; renderMessages(state.messages); renderModifiedFiles(); await loadSessions();
 }
-function newChat() { state.sessionId = null; state.messages = []; state.attachments = []; renderAttachments(); $("sessionTitle").textContent = "新对话"; renderMessages(state.messages); $("toolRail").innerHTML = ""; loadSessions(); prompt.focus(); }
+function newChat() { state.sessionId = null; state.messages = []; state.attachments = []; state.toolRuns = []; renderAttachments(); $("sessionTitle").textContent = "新对话"; renderMessages(state.messages); renderModifiedFiles(); loadSessions(); prompt.focus(); }
 async function deleteSession(id) {
   if (state.sending || state.uploading || !id) return;
   if (!window.confirm("确定删除这个会话及其全部聊天记录吗？此操作不可撤销。")) return;
@@ -96,8 +153,20 @@ async function deleteSession(id) {
 }
 function renderAttachments() {
   const list = $("attachmentList");
-  list.innerHTML = state.attachments.map((item, index) => `<span class="attachment-chip"><span class="attachment-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span><small>${formatBytes(item.size)}</small><button type="button" data-attachment-index="${index}" title="移除附件" aria-label="移除 ${escapeHtml(item.name)}">×</button></span>`).join("");
-  list.querySelectorAll("button[data-attachment-index]").forEach((button) => button.addEventListener("click", () => { state.attachments.splice(Number(button.dataset.attachmentIndex), 1); renderAttachments(); }));
+  list.innerHTML = state.attachments.map((item, index) => `<span class="attachment-chip"><span class="attachment-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span><small>${formatBytes(item.size)}</small><button type="button" data-attachment-index="${index}" title="取消上传" aria-label="取消上传 ${escapeHtml(item.name)}">×</button></span>`).join("");
+  list.querySelectorAll("button[data-attachment-index]").forEach((button) => button.addEventListener("click", () => removeAttachment(Number(button.dataset.attachmentIndex))));
+}
+async function removeAttachment(index) {
+  if (state.sending || state.uploading || !state.attachments[index]) return;
+  const attachment = state.attachments[index];
+  try {
+    const response = await fetch(`/api/uploads?path=${encodeURIComponent(attachment.path)}`, { method: "DELETE" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "取消上传失败");
+    state.attachments.splice(index, 1);
+    renderAttachments();
+    setAttachmentNotice(`已取消上传 ${attachment.name}`);
+  } catch (error) { setAttachmentNotice(`${attachment.name}: ${error.message}`, true); }
 }
 function formatBytes(size) { if (size < 1024) return `${size} B`; if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`; return `${(size / (1024 * 1024)).toFixed(1)} MB`; }
 function setAttachmentNotice(message, isError = false) { const notice = $("attachmentNotice"); notice.textContent = message; notice.className = `attachment-notice${isError ? " error" : ""}`; }
@@ -112,6 +181,10 @@ async function uploadAttachment(file) {
 }
 async function handleAttachments(event) {
   const files = [...event.target.files]; event.target.value = "";
+  await uploadFiles(files);
+}
+async function uploadFiles(files) {
+  if (state.sending) { setAttachmentNotice("Agent 正在执行，完成后再添加附件", true); return; }
   if (!files.length) return;
   const remaining = MAX_ATTACHMENTS_PER_TURN - state.attachments.length;
   const selected = files.slice(0, Math.max(remaining, 0));
@@ -133,16 +206,17 @@ async function handleAttachments(event) {
 function appendTool(data, running) { const rail = $("toolRail"); const id = `${data.name}-${rail.children.length}`; const node = document.createElement("div"); node.className = `tool-event ${running ? "running" : data.status}`; node.dataset.toolId = id; node.textContent = `${running ? "◌" : data.status === "done" ? "✓" : "×"}  ${data.label}`; rail.appendChild(node); messages.scrollTop = messages.scrollHeight; return id; }
 async function sendTask(event) {
   event.preventDefault(); if (state.sending || state.uploading || !prompt.value.trim()) return;
-  const task = prompt.value.trim(); prompt.value = ""; state.sending = true; $("send").disabled = true; $("attachments").disabled = true; $("toolRail").innerHTML = "";
+  const task = prompt.value.trim(); prompt.value = ""; state.sending = true; $("send").disabled = true; $("attachments").disabled = true;
   const previousMessages = state.messages.slice();
-  state.messages = [...previousMessages, { role: "user", content: task }];
+  state.messages = [...previousMessages, { role: "user", content: task, attachments: state.attachments.map((item) => ({ name: item.name, size: item.size })) }];
   renderMessages(state.messages);
   try {
     const response = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: state.sessionId, task, attachments: state.attachments.map((item) => item.path) }) });
     if (!response.ok) throw new Error((await response.json()).error || "请求失败");
     const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
-    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.classList.contains("running")); if (node) { node.className = `tool-event ${data.status}`; node.innerHTML = `<span>${data.status === "done" ? "✓" : "×"}  ${escapeHtml(data.label)}</span>${renderDiff(data.diff) || ""}`; } } if (eventName === "complete") { setThinking(false); if (data.id) { state.sessionId = data.id; } if (Array.isArray(data.messages)) { state.messages = data.messages; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话"; } if (data.error) { renderMessages(state.messages); await loadSessions(); throw new Error(data.error); } renderMessages(state.messages); state.attachments = []; renderAttachments(); setAttachmentNotice(""); await loadSessions(); } } }
-  } catch (error) { setThinking(false); renderMessages([...state.messages, { role: "assistant", content: `请求失败：${error.message}` }]); } finally { state.sending = false; $("send").disabled = false; $("attachments").disabled = false; prompt.focus(); }
+    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.classList.contains("running")); if (node) { node.className = `tool-event ${data.status}`; node.innerHTML = `<span>${data.status === "done" ? "✓" : "×"}  ${escapeHtml(data.label)}</span>${renderDiff(data.diff) || ""}`; } } if (eventName === "complete") { setThinking(false); if (data.id) { state.sessionId = data.id; } if (Array.isArray(data.messages)) { state.messages = data.messages; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话"; } if (Array.isArray(data.tool_runs)) state.toolRuns = data.tool_runs; state.sending = false; renderMessages(state.messages); renderModifiedFiles(); if (data.error) { await loadSessions(); throw new Error(data.error); } state.attachments = []; renderAttachments(); setAttachmentNotice(""); await loadSessions(); } } }
+  } catch (error) { setThinking(false); state.sending = false; renderMessages([...state.messages, { role: "assistant", content: `请求失败：${error.message}` }]); } finally { state.sending = false; $("send").disabled = false; $("attachments").disabled = false; prompt.focus(); }
 }
-$("composer").addEventListener("submit", sendTask); $("newChat").addEventListener("click", newChat); $("refresh").addEventListener("click", loadSessions); $("attachments").addEventListener("change", handleAttachments); prompt.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); $("composer").requestSubmit(); } }); prompt.addEventListener("input", () => { prompt.style.height = "auto"; prompt.style.height = `${Math.min(prompt.scrollHeight, 180)}px`; });
+const composer = $("composer");
+composer.addEventListener("submit", sendTask); $("newChat").addEventListener("click", newChat); $("refresh").addEventListener("click", loadSessions); $("attachments").addEventListener("change", handleAttachments); composer.addEventListener("dragover", (event) => { if (Array.from(event.dataTransfer?.types || []).includes("Files")) { event.preventDefault(); composer.classList.add("dragging-files"); } }); composer.addEventListener("dragleave", (event) => { if (!composer.contains(event.relatedTarget)) composer.classList.remove("dragging-files"); }); composer.addEventListener("drop", (event) => { event.preventDefault(); composer.classList.remove("dragging-files"); if (event.dataTransfer?.files) uploadFiles([...event.dataTransfer.files]); }); prompt.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); composer.requestSubmit(); } }); prompt.addEventListener("input", () => { prompt.style.height = "auto"; prompt.style.height = `${Math.min(prompt.scrollHeight, 180)}px`; });
 loadSessions();

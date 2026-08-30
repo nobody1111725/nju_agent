@@ -27,6 +27,12 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(answer, "完成了")
             self.assertEqual(len(client.calls), 1)
 
+    def test_system_prompt_requires_in_place_edits_for_existing_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            agent = Agent(FakeClient([]), LocalTools(Path(directory)))
+            self.assertIn("use edit_file on that same path", agent._system_prompt())
+            self.assertIn("do not create a duplicate", agent._system_prompt())
+
     def test_tool_call_is_executed_and_returned_to_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             Path(directory, "hello.txt").write_text("hello", encoding="utf-8")

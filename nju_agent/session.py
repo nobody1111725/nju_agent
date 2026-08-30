@@ -21,6 +21,7 @@ class Session:
     id: str
     messages: list[dict[str, Any]] = field(default_factory=list)
     plan: dict[str, Any] = field(default_factory=dict)
+    tool_runs: list[dict[str, Any]] = field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
 
@@ -111,7 +112,7 @@ def _now() -> str:
 
 
 def _to_dict(session: Session) -> dict[str, Any]:
-    return {"id": session.id, "messages": session.messages, "plan": session.plan, "created_at": session.created_at, "updated_at": session.updated_at}
+    return {"id": session.id, "messages": session.messages, "plan": session.plan, "tool_runs": session.tool_runs, "created_at": session.created_at, "updated_at": session.updated_at}
 
 
 def _from_dict(data: Any) -> Session:
@@ -121,6 +122,7 @@ def _from_dict(data: Any) -> Session:
         id=data["id"],
         messages=data.get("messages", []),
         plan=data.get("plan", {}) if isinstance(data.get("plan", {}), dict) else {},
+        tool_runs=data.get("tool_runs", []) if isinstance(data.get("tool_runs", []), list) else [],
         created_at=str(data.get("created_at", "")),
         updated_at=str(data.get("updated_at", "")),
     )

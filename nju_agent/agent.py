@@ -171,6 +171,7 @@ class Agent:
         return (
             "You are a programming assistant operating on a local workspace. "
             "Use local tools when needed; the tool execution happens on the user's machine. "
+            "When modifying an existing file, use edit_file on that same path; do not create a duplicate or renamed copy unless the user explicitly asks for a new file. "
             "For multi-step tasks, call update_plan first, keep it current, and mark completed steps. "
             "For project inspection tasks, inspect only the necessary files, then run tests or explain why they cannot run; do not repeatedly reread unchanged files. "
             "After the task is complete, provide a concise final answer.\n\n"

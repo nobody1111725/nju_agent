@@ -5,6 +5,7 @@ import threading
 import unittest
 import urllib.request
 import urllib.error
+import urllib.parse
 from pathlib import Path
 
 from nju_agent.web import AgentWebServer
@@ -68,6 +69,7 @@ class WebConversationTests(unittest.TestCase):
 
                 self.assertEqual(second_event["answer"], "第2轮完成")
                 self.assertEqual([item["content"] for item in second_event["messages"]], ["第一轮", "第1轮完成", "第二轮", "第2轮完成"])
+                self.assertEqual([item["assistant_message_index"] for item in second_event["tool_runs"]], [1, 3])
             finally:
                 server.shutdown()
                 server.server_close()
@@ -116,6 +118,13 @@ class WebAttachmentTests(unittest.TestCase):
         with urllib.request.urlopen(f"{self.base_url}{path}", timeout=3) as response:
             return response.status, json.loads(response.read())
 
+    def get_text(self, path):
+        try:
+            with urllib.request.urlopen(f"{self.base_url}{path}", timeout=3) as response:
+                return response.status, response.read().decode("utf-8")
+        except urllib.error.HTTPError as error:
+            return error.code, error.read().decode("utf-8")
+
     def test_upload_and_chat_exposes_attachment_to_agent(self) -> None:
         content = "print('hello')\n"
         status, uploaded = self.post_json("/api/uploads", {"name": "hello.py", "content_base64": base64.b64encode(content.encode()).decode()})
@@ -134,6 +143,27 @@ class WebAttachmentTests(unittest.TestCase):
         complete = next(chunk for chunk in stream.split("\n\n") if chunk.startswith("event: complete\n"))
         event = json.loads(complete.split("data: ", 1)[1])
         self.assertEqual(event["messages"][-2]["content"], "检查附件")
+        self.assertEqual(event["messages"][-2]["attachments"], [{"name": "hello.py", "size": len(content.encode())}])
+
+        status, restored = self.get_json(f"/api/sessions/{event['id']}")
+        self.assertEqual(status, 200)
+        self.assertEqual(restored["messages"][-2]["attachments"], [{"name": "hello.py", "size": len(content.encode())}])
+
+    def test_cancel_upload_removes_temporary_attachment(self) -> None:
+        content = "print('temporary')\n"
+        status, uploaded = self.post_json("/api/uploads", {"name": "temporary.py", "content_base64": base64.b64encode(content.encode()).decode()})
+        self.assertEqual(status, 201)
+        attachment = Path(self.directory.name) / uploaded["path"]
+        self.assertTrue(attachment.is_file())
+
+        status, payload = self.delete_json(f"/api/uploads?{urllib.parse.urlencode({'path': uploaded['path']})}")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, {"deleted": True, "path": uploaded["path"]})
+        self.assertFalse(attachment.exists())
+
+        status, payload = self.delete_json(f"/api/uploads?{urllib.parse.urlencode({'path': uploaded['path']})}")
+        self.assertEqual(status, 400)
+        self.assertIn("Attachment", payload["error"])
 
     def test_upload_rejects_unsupported_binary_and_invalid_names(self) -> None:
         encoded = base64.b64encode(b"data").decode()
@@ -186,6 +216,32 @@ class WebAttachmentTests(unittest.TestCase):
         self.assertEqual(diff["path"], "main.py")
         self.assertIn("-old", diff["lines"])
         self.assertIn("+new", diff["lines"])
+        complete = next(chunk for chunk in stream.split("\n\n") if chunk.startswith("event: complete\n"))
+        saved = json.loads(complete.split("data: ", 1)[1])
+        self.assertEqual(saved["tool_runs"][0]["task"], "修改 main.py")
+        self.assertEqual(saved["tool_runs"][0]["assistant_message_index"], 1)
+        self.assertEqual(saved["tool_runs"][0]["events"][0]["diff"]["path"], "main.py")
+
+        status, restored = self.get_json(f"/api/sessions/{saved['id']}")
+        self.assertEqual(status, 200)
+        self.assertEqual(restored["tool_runs"], saved["tool_runs"])
+
+    def test_modified_file_endpoint_opens_only_files_from_session_diffs(self) -> None:
+        Path(self.directory.name, "main.py").write_text("print('current')\n", encoding="utf-8")
+        Path(self.directory.name, "unrelated.py").write_text("print('private')\n", encoding="utf-8")
+        session = self.server.store.create()
+        session.tool_runs = [{"id": "run-1", "events": [{"diff": {"path": "main.py"}}]}]
+        self.server.store.save(session)
+        query = urllib.parse.urlencode({"session_id": session.id, "path": "main.py"})
+
+        status, content = self.get_text(f"/api/modified-file?{query}")
+        self.assertEqual(status, 200)
+        self.assertEqual(content, "print('current')\n")
+
+        query = urllib.parse.urlencode({"session_id": session.id, "path": "unrelated.py"})
+        status, content = self.get_text(f"/api/modified-file?{query}")
+        self.assertEqual(status, 400)
+        self.assertIn("not modified", content)
 
     def test_delete_session_removes_entire_saved_record(self) -> None:
         status, stream = self.post_stream("/api/chat/stream", {"task": "需要删除的会话"})
