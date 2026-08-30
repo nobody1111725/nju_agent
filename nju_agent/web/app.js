@@ -57,6 +57,18 @@ function setThinking(visible) {
   rail.appendChild(node);
   messages.scrollTop = messages.scrollHeight;
 }
+function renderDiff(diff) {
+  if (!diff || !Array.isArray(diff.lines) || !diff.lines.length) return null;
+  const summary = `修改前后差异 · ${diff.path} (+${diff.added || 0} / -${diff.removed || 0})`;
+  const lines = diff.lines.map((line) => {
+    let kind = "context";
+    if (line.startsWith("@@") || line.startsWith("---") || line.startsWith("+++")) kind = "meta";
+    else if (line.startsWith("+")) kind = "added";
+    else if (line.startsWith("-")) kind = "removed";
+    return `<div class="diff-line ${kind}"><span>${escapeHtml(line)}</span></div>`;
+  }).join("");
+  return `<details class="diff-view" open><summary>${escapeHtml(summary)}</summary><div class="diff-lines">${lines}</div></details>`;
+}
 async function loadSessions() {
   const response = await fetch("/api/sessions");
   const data = await response.json();
@@ -129,7 +141,7 @@ async function sendTask(event) {
     const response = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: state.sessionId, task, attachments: state.attachments.map((item) => item.path) }) });
     if (!response.ok) throw new Error((await response.json()).error || "请求失败");
     const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
-    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.textContent.includes(data.label)); if (node) { node.className = `tool-event ${data.status}`; node.textContent = `${data.status === "done" ? "✓" : "×"}  ${data.label}`; } } if (eventName === "complete") { setThinking(false); if (data.id) { state.sessionId = data.id; } if (Array.isArray(data.messages)) { state.messages = data.messages; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话"; } if (data.error) { renderMessages(state.messages); await loadSessions(); throw new Error(data.error); } renderMessages(state.messages); state.attachments = []; renderAttachments(); setAttachmentNotice(""); await loadSessions(); } } }
+    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.classList.contains("running")); if (node) { node.className = `tool-event ${data.status}`; node.innerHTML = `<span>${data.status === "done" ? "✓" : "×"}  ${escapeHtml(data.label)}</span>${renderDiff(data.diff) || ""}`; } } if (eventName === "complete") { setThinking(false); if (data.id) { state.sessionId = data.id; } if (Array.isArray(data.messages)) { state.messages = data.messages; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话"; } if (data.error) { renderMessages(state.messages); await loadSessions(); throw new Error(data.error); } renderMessages(state.messages); state.attachments = []; renderAttachments(); setAttachmentNotice(""); await loadSessions(); } } }
   } catch (error) { setThinking(false); renderMessages([...state.messages, { role: "assistant", content: `请求失败：${error.message}` }]); } finally { state.sending = false; $("send").disabled = false; $("attachments").disabled = false; prompt.focus(); }
 }
 $("composer").addEventListener("submit", sendTask); $("newChat").addEventListener("click", newChat); $("refresh").addEventListener("click", loadSessions); $("attachments").addEventListener("change", handleAttachments); prompt.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); $("composer").requestSubmit(); } }); prompt.addEventListener("input", () => { prompt.style.height = "auto"; prompt.style.height = `${Math.min(prompt.scrollHeight, 180)}px`; });

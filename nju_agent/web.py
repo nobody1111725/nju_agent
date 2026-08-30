@@ -177,6 +177,7 @@ class AgentWebHandler(BaseHTTPRequestHandler):
 
         if session is None:
             session = self.server.store.create()
+        local_tools = LocalTools(self.server.workspace)
         events: queue.Queue[dict[str, Any]] = queue.Queue()
         finished = threading.Event()
         result: dict[str, Any] = {}
@@ -186,7 +187,10 @@ class AgentWebHandler(BaseHTTPRequestHandler):
 
         def on_end(name: str, arguments: Any, output: str | None) -> None:
             success = output is not None and not output.startswith("Tool error:")
-            events.put({"event": "tool_end", "name": name, "label": TerminalToolDisplay._label(name, arguments), "status": "done" if success else "failed"})
+            event: dict[str, Any] = {"event": "tool_end", "name": name, "label": TerminalToolDisplay._label(name, arguments), "status": "done" if success else "failed"}
+            if success and local_tools.last_diff is not None and name in {"write_file", "edit_file"}:
+                event["diff"] = local_tools.last_diff
+            events.put(event)
 
         def on_model_response() -> None:
             events.put({"event": "model_response"})
@@ -194,7 +198,7 @@ class AgentWebHandler(BaseHTTPRequestHandler):
         def run() -> None:
             agent: Agent | None = None
             try:
-                agent = Agent(self.server.client_factory(), LocalTools(self.server.workspace), on_tool_start=on_start, on_tool_end=on_end, on_model_response=on_model_response)
+                agent = Agent(self.server.client_factory(), local_tools, on_tool_start=on_start, on_tool_end=on_end, on_model_response=on_model_response)
                 if session.messages:
                     agent.plan.restore(session.plan)
                 agent_task = self._task_with_attachments(task, attachment_paths)

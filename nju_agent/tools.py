@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import difflib
 import subprocess
 from pathlib import Path
 from typing import Any, Callable
@@ -24,6 +25,7 @@ class LocalTools:
         self.command_timeout = command_timeout
         self.output_limit = output_limit
         self.plan = plan or TaskPlan()
+        self.last_diff: dict[str, Any] | None = None
         self.functions: dict[str, ToolFunction] = {
             "list_files": self.list_files,
             "read_file": self.read_file,
@@ -48,6 +50,7 @@ class LocalTools:
         return {"type": "function", "function": {"name": name, "description": description, "parameters": {"type": "object", "properties": properties, "required": required or [], "additionalProperties": False}}}
 
     def execute(self, name: str, arguments: str | dict[str, Any]) -> str:
+        self.last_diff = None
         function = self.functions.get(name)
         if function is None:
             raise ToolError(f"Unknown tool: {name}")
@@ -105,8 +108,15 @@ class LocalTools:
         if not isinstance(content, str):
             raise ToolError("content must be a string")
         target = self._path(relative)
+        before = ""
+        if target.is_file():
+            try:
+                before = target.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                before = None
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8", newline="")
+        self.last_diff = self._make_diff(str(relative), before, content)
         return f"Wrote {len(content)} characters to {target.relative_to(self.workspace)}"
 
     def edit_file(self, arguments: dict[str, Any]) -> str:
@@ -125,8 +135,51 @@ class LocalTools:
         occurrences = content.count(old_text)
         if occurrences != 1:
             raise ToolError(f"old_text must occur exactly once; found {occurrences}")
-        target.write_text(content.replace(old_text, new_text, 1), encoding="utf-8", newline="")
+        updated = content.replace(old_text, new_text, 1)
+        target.write_text(updated, encoding="utf-8", newline="")
+        self.last_diff = self._make_diff(str(relative), content, updated)
         return f"Edited {target.relative_to(self.workspace)}"
+
+    @staticmethod
+    def _make_diff(path: str, before: str | None, after: str) -> dict[str, Any]:
+        """Build a bounded unified diff for the local UI."""
+        if before is None:
+            before_lines: list[str] = []
+            before_available = False
+        else:
+            before_lines = before.splitlines()
+            before_available = True
+        after_lines = after.splitlines()
+        raw_lines = list(
+            difflib.unified_diff(
+                before_lines,
+                after_lines,
+                fromfile=f"a/{path}",
+                tofile=f"b/{path}",
+                lineterm="",
+            )
+        )
+        max_lines = 500
+        max_chars = 20_000
+        lines: list[str] = []
+        used_chars = 0
+        truncated = False
+        for line in raw_lines:
+            if len(lines) >= max_lines or used_chars + len(line) > max_chars:
+                truncated = True
+                break
+            lines.append(line)
+            used_chars += len(line)
+        if truncated:
+            lines.append("... diff truncated ...")
+        return {
+            "path": path,
+            "lines": lines,
+            "added": sum(1 for line in raw_lines if line.startswith("+") and not line.startswith("+++")),
+            "removed": sum(1 for line in raw_lines if line.startswith("-") and not line.startswith("---")),
+            "before_available": before_available,
+            "truncated": truncated,
+        }
 
     def run_command(self, arguments: dict[str, Any]) -> str:
         command = arguments.get("command")

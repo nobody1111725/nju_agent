@@ -28,6 +28,17 @@ class _CaptureClient:
         return {"content": "已读取附件", "tool_calls": []}
 
 
+class _EditClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def complete(self, messages, tools):
+        self.calls += 1
+        if self.calls == 1:
+            return {"content": "", "tool_calls": [{"id": "edit-1", "function": {"name": "edit_file", "arguments": json.dumps({"path": "main.py", "old_text": "old", "new_text": "new"})}}]}
+        return {"content": "已完成修改", "tool_calls": []}
+
+
 class WebConversationTests(unittest.TestCase):
     def test_same_new_session_accepts_a_second_message(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -158,6 +169,23 @@ class WebAttachmentTests(unittest.TestCase):
         status, payload = self.post_json("/api/uploads", {"name": "large.txt", "content_base64": base64.b64encode(content).decode()})
         self.assertEqual(status, 400)
         self.assertIn("2 MB", payload["error"])
+
+    def test_edit_tool_stream_includes_file_diff(self) -> None:
+        Path(self.directory.name, "main.py").write_text("old\nkeep\n", encoding="utf-8")
+        self.client = _EditClient()
+        self.server.client_factory = lambda: self.client
+        status, stream = self.post_stream("/api/chat/stream", {"task": "修改 main.py"})
+        self.assertEqual(status, 200)
+        events = []
+        for chunk in stream.split("\n\n"):
+            if chunk.startswith("event: tool_end\n"):
+                events.append(json.loads(chunk.split("data: ", 1)[1]))
+        self.assertEqual(len(events), 1)
+        diff = events[0].get("diff")
+        self.assertIsNotNone(diff)
+        self.assertEqual(diff["path"], "main.py")
+        self.assertIn("-old", diff["lines"])
+        self.assertIn("+new", diff["lines"])
 
     def test_delete_session_removes_entire_saved_record(self) -> None:
         status, stream = self.post_stream("/api/chat/stream", {"task": "需要删除的会话"})

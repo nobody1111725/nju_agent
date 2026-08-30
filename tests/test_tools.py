@@ -14,6 +14,21 @@ class LocalToolsTests(unittest.TestCase):
             tools.execute("edit_file", {"path": "src/main.py", "old_text": "old", "new_text": "new"})
             self.assertEqual(tools.execute("read_file", {"path": "src/main.py"}), "1: print('new')")
 
+    def test_file_edits_capture_unified_diff(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            tools = LocalTools(Path(directory))
+            tools.execute("write_file", {"path": "main.py", "content": "old()\nkeep()\n"})
+            self.assertIsNotNone(tools.last_diff)
+            self.assertEqual(tools.last_diff["added"], 2)
+            tools.execute("edit_file", {"path": "main.py", "old_text": "old()", "new_text": "new()"})
+            diff = tools.last_diff
+            self.assertIsNotNone(diff)
+            self.assertEqual(diff["path"], "main.py")
+            self.assertEqual(diff["added"], 1)
+            self.assertEqual(diff["removed"], 1)
+            self.assertTrue(any(line == "-old()" for line in diff["lines"]))
+            self.assertTrue(any(line == "+new()" for line in diff["lines"]))
+
     def test_path_cannot_escape_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             tools = LocalTools(Path(directory))

@@ -30,3 +30,5 @@
 浏览器附件通过本地 `/api/uploads` 接口以 Base64 文本上传。服务端只接受常见源码、配置和文档扩展名，以及 `Makefile`、`Dockerfile`；附件必须是 UTF-8 文本，单文件最大 2 MB、每轮最多 10 个。文件落在工作区内的 `.nju-agent-attachments/<随机目录>/`，聊天接口只接受该目录中的真实文件路径，并将路径提示给 Agent 通过已有的 `read_file` 本地工具读取。附件内容不发送到第三方文件服务，也不使用托管代码执行工具。
 
 会话列表中的删除操作调用 `DELETE /api/sessions/{id}`，服务端按完整 ID 或短 ID 定位会话，并通过 `SessionStore.delete` 原子重写会话文件；删除当前会话后前端回到新对话状态。删除只影响会话记录，不会删除工作区源代码。
+
+`LocalTools` 在 `write_file` 和 `edit_file` 成功后用内存中的修改前后文本生成有行数上限的 unified diff。Web 层通过 `tool_end` SSE 事件发送差异，前端按新增、删除、元数据和上下文行着色展示；差异不会写入会话历史，也不会调用 Git 或创建 commit。
