@@ -1,8 +1,10 @@
 import json
+import base64
 import tempfile
 import threading
 import unittest
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 from nju_agent.web import AgentWebServer
@@ -15,6 +17,15 @@ class _TwoTurnClient:
     def complete(self, messages, tools):
         self.calls += 1
         return {"content": f"第{self.calls}轮完成", "tool_calls": []}
+
+
+class _CaptureClient:
+    def __init__(self) -> None:
+        self.requests = []
+
+    def complete(self, messages, tools):
+        self.requests.append(messages)
+        return {"content": "已读取附件", "tool_calls": []}
 
 
 class WebConversationTests(unittest.TestCase):
@@ -50,6 +61,122 @@ class WebConversationTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 thread.join(timeout=2)
+
+
+class WebAttachmentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.client = _CaptureClient()
+        self.server = AgentWebServer(("127.0.0.1", 0), Path(self.directory.name), lambda: self.client)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.base_url = f"http://127.0.0.1:{self.server.server_address[1]}"
+
+    def tearDown(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        self.directory.cleanup()
+
+    def post_json(self, path, payload):
+        body = json.dumps(payload).encode()
+        request = urllib.request.Request(f"{self.base_url}{path}", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=3) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read())
+
+    def post_stream(self, path, payload):
+        body = json.dumps(payload).encode()
+        request = urllib.request.Request(f"{self.base_url}{path}", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=3) as response:
+            return response.status, response.read().decode()
+
+    def delete_json(self, path):
+        request = urllib.request.Request(f"{self.base_url}{path}", headers={"Content-Type": "application/json"}, method="DELETE")
+        try:
+            with urllib.request.urlopen(request, timeout=3) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read())
+
+    def get_json(self, path):
+        with urllib.request.urlopen(f"{self.base_url}{path}", timeout=3) as response:
+            return response.status, json.loads(response.read())
+
+    def test_upload_and_chat_exposes_attachment_to_agent(self) -> None:
+        content = "print('hello')\n"
+        status, uploaded = self.post_json("/api/uploads", {"name": "hello.py", "content_base64": base64.b64encode(content.encode()).decode()})
+        self.assertEqual(status, 201)
+        self.assertEqual(uploaded["name"], "hello.py")
+        attachment = Path(self.directory.name) / uploaded["path"]
+        self.assertTrue(attachment.is_file())
+        self.assertEqual(attachment.read_text(encoding="utf-8"), content)
+
+        status, stream = self.post_stream("/api/chat/stream", {"task": "检查附件", "attachments": [uploaded["path"]]})
+        self.assertEqual(status, 200)
+        self.assertIn("event: complete", stream)
+
+        request_messages = self.client.requests[0]
+        self.assertIn(uploaded["path"], request_messages[-1]["content"])
+        complete = next(chunk for chunk in stream.split("\n\n") if chunk.startswith("event: complete\n"))
+        event = json.loads(complete.split("data: ", 1)[1])
+        self.assertEqual(event["messages"][-2]["content"], "检查附件")
+
+    def test_upload_rejects_unsupported_binary_and_invalid_names(self) -> None:
+        encoded = base64.b64encode(b"data").decode()
+        for name in ("program.exe", "../escape.py", "folder/file.py"):
+            status, payload = self.post_json("/api/uploads", {"name": name, "content_base64": encoded})
+            self.assertEqual(status, 400)
+            self.assertIn("error", payload)
+
+        status, payload = self.post_json("/api/uploads", {"name": "bad.py", "content_base64": "%%%"})
+        self.assertEqual(status, 400)
+        self.assertIn("base64", payload["error"])
+
+        status, payload = self.post_json("/api/uploads", {"name": "bad.py", "content_base64": base64.b64encode(b"\xff").decode()})
+        self.assertEqual(status, 400)
+        self.assertIn("UTF-8", payload["error"])
+
+    def test_chat_rejects_paths_outside_upload_directory(self) -> None:
+        outside = Path(self.directory.name) / "outside.py"
+        outside.write_text("print(1)", encoding="utf-8")
+        for path in ("outside.py", "../outside.py", ".nju-agent-attachments/missing.py"):
+            status, payload = self.post_json("/api/chat/stream", {"task": "读取", "attachments": [path]})
+            self.assertEqual(status, 400)
+            self.assertIn("Attachment", payload["error"])
+
+    def test_chat_rejects_more_than_ten_attachments(self) -> None:
+        paths = [f".nju-agent-attachments/{index}/file.py" for index in range(11)]
+        status, payload = self.post_json("/api/chat/stream", {"task": "读取", "attachments": paths})
+        self.assertEqual(status, 400)
+        self.assertIn("at most 10", payload["error"])
+
+    def test_upload_rejects_file_larger_than_two_megabytes(self) -> None:
+        content = b"a" * (2 * 1024 * 1024 + 1)
+        status, payload = self.post_json("/api/uploads", {"name": "large.txt", "content_base64": base64.b64encode(content).decode()})
+        self.assertEqual(status, 400)
+        self.assertIn("2 MB", payload["error"])
+
+    def test_delete_session_removes_entire_saved_record(self) -> None:
+        status, stream = self.post_stream("/api/chat/stream", {"task": "需要删除的会话"})
+        self.assertEqual(status, 200)
+        complete = next(chunk for chunk in stream.split("\n\n") if chunk.startswith("event: complete\n"))
+        event = json.loads(complete.split("data: ", 1)[1])
+        session_id = event["id"]
+        short_id = event["short_id"]
+
+        status, deleted = self.delete_json(f"/api/sessions/{short_id}")
+        self.assertEqual(status, 200)
+        self.assertEqual(deleted, {"deleted": True, "id": session_id, "short_id": short_id})
+
+        status, sessions = self.get_json("/api/sessions")
+        self.assertEqual(status, 200)
+        self.assertFalse(any(item["id"] == session_id for item in sessions["sessions"]))
+        status, payload = self.delete_json(f"/api/sessions/{session_id}")
+        self.assertEqual(status, 404)
+        self.assertEqual(payload["error"], "Session not found")
 
 
 if __name__ == "__main__":

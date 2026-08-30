@@ -1,4 +1,6 @@
-const state = { sessionId: null, sending: false, messages: [] };
+const MAX_ATTACHMENTS_PER_TURN = 10;
+const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
+const state = { sessionId: null, sending: false, uploading: false, messages: [], attachments: [] };
 const $ = (id) => document.getElementById(id);
 const messages = $("messages");
 const prompt = $("prompt");
@@ -59,28 +61,76 @@ async function loadSessions() {
   const response = await fetch("/api/sessions");
   const data = await response.json();
   const list = $("sessions");
-  list.innerHTML = (data.sessions || []).map((item) => `<button class="session-item ${item.id === state.sessionId ? "active" : ""}" data-id="${item.id}">${escapeHtml(item.messages.find((m) => m.role === "user")?.content || "新会话")}<small>${escapeHtml(item.short_id)}</small></button>`).join("");
+  list.innerHTML = (data.sessions || []).map((item) => `<div class="session-row"><button class="session-item ${item.id === state.sessionId ? "active" : ""}" data-id="${escapeHtml(item.id)}">${escapeHtml(item.messages.find((m) => m.role === "user")?.content || "新会话")}<small>${escapeHtml(item.short_id)}</small></button><button class="session-delete" data-id="${escapeHtml(item.id)}" title="删除会话" aria-label="删除会话 ${escapeHtml(item.short_id)}">&#128465;</button></div>`).join("");
   list.querySelectorAll(".session-item").forEach((button) => button.addEventListener("click", () => openSession(button.dataset.id)));
+  list.querySelectorAll(".session-delete").forEach((button) => button.addEventListener("click", (event) => { event.stopPropagation(); deleteSession(button.dataset.id); }));
 }
 async function openSession(id) {
   const response = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
   if (!response.ok) return;
   const data = await response.json(); state.sessionId = data.id; state.messages = Array.isArray(data.messages) ? data.messages : []; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已恢复会话"; renderMessages(state.messages); await loadSessions();
 }
-function newChat() { state.sessionId = null; state.messages = []; $("sessionTitle").textContent = "新对话"; renderMessages(state.messages); $("toolRail").innerHTML = ""; loadSessions(); prompt.focus(); }
+function newChat() { state.sessionId = null; state.messages = []; state.attachments = []; renderAttachments(); $("sessionTitle").textContent = "新对话"; renderMessages(state.messages); $("toolRail").innerHTML = ""; loadSessions(); prompt.focus(); }
+async function deleteSession(id) {
+  if (state.sending || state.uploading || !id) return;
+  if (!window.confirm("确定删除这个会话及其全部聊天记录吗？此操作不可撤销。")) return;
+  try {
+    const response = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "删除会话失败");
+    if (state.sessionId === id) newChat();
+    else await loadSessions();
+  } catch (error) { window.alert(`删除会话失败：${error.message}`); }
+}
+function renderAttachments() {
+  const list = $("attachmentList");
+  list.innerHTML = state.attachments.map((item, index) => `<span class="attachment-chip"><span class="attachment-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span><small>${formatBytes(item.size)}</small><button type="button" data-attachment-index="${index}" title="移除附件" aria-label="移除 ${escapeHtml(item.name)}">×</button></span>`).join("");
+  list.querySelectorAll("button[data-attachment-index]").forEach((button) => button.addEventListener("click", () => { state.attachments.splice(Number(button.dataset.attachmentIndex), 1); renderAttachments(); }));
+}
+function formatBytes(size) { if (size < 1024) return `${size} B`; if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`; return `${(size / (1024 * 1024)).toFixed(1)} MB`; }
+function setAttachmentNotice(message, isError = false) { const notice = $("attachmentNotice"); notice.textContent = message; notice.className = `attachment-notice${isError ? " error" : ""}`; }
+async function uploadAttachment(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+  const response = await fetch("/api/uploads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: file.name, content_base64: btoa(binary) }) });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "附件上传失败");
+  return data;
+}
+async function handleAttachments(event) {
+  const files = [...event.target.files]; event.target.value = "";
+  if (!files.length) return;
+  const remaining = MAX_ATTACHMENTS_PER_TURN - state.attachments.length;
+  const selected = files.slice(0, Math.max(remaining, 0));
+  if (!selected.length) { setAttachmentNotice(`每轮最多添加 ${MAX_ATTACHMENTS_PER_TURN} 个附件`, true); return; }
+  state.uploading = true; $("send").disabled = true;
+  setAttachmentNotice(`正在上传 ${selected.length} 个附件...`);
+  for (const file of selected) {
+    if (file.size > MAX_ATTACHMENT_BYTES) { setAttachmentNotice(`${file.name}: 附件不能超过 2 MB`, true); continue; }
+    try {
+      const uploaded = await uploadAttachment(file);
+      if (!state.attachments.some((item) => item.path === uploaded.path)) state.attachments.push(uploaded);
+    } catch (error) { setAttachmentNotice(`${file.name}: ${error.message}`, true); }
+  }
+  state.uploading = false; $("send").disabled = false;
+  renderAttachments();
+  if (files.length > selected.length) setAttachmentNotice(`最多 ${MAX_ATTACHMENTS_PER_TURN} 个附件，已忽略 ${files.length - selected.length} 个`, true);
+  else if (state.attachments.length && !$("attachmentNotice").classList.contains("error")) setAttachmentNotice(`已添加 ${state.attachments.length} 个附件`);
+}
 function appendTool(data, running) { const rail = $("toolRail"); const id = `${data.name}-${rail.children.length}`; const node = document.createElement("div"); node.className = `tool-event ${running ? "running" : data.status}`; node.dataset.toolId = id; node.textContent = `${running ? "◌" : data.status === "done" ? "✓" : "×"}  ${data.label}`; rail.appendChild(node); messages.scrollTop = messages.scrollHeight; return id; }
 async function sendTask(event) {
-  event.preventDefault(); if (state.sending || !prompt.value.trim()) return;
-  const task = prompt.value.trim(); prompt.value = ""; state.sending = true; $("send").disabled = true; $("toolRail").innerHTML = "";
+  event.preventDefault(); if (state.sending || state.uploading || !prompt.value.trim()) return;
+  const task = prompt.value.trim(); prompt.value = ""; state.sending = true; $("send").disabled = true; $("attachments").disabled = true; $("toolRail").innerHTML = "";
   const previousMessages = state.messages.slice();
   state.messages = [...previousMessages, { role: "user", content: task }];
   renderMessages(state.messages);
   try {
-    const response = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: state.sessionId, task }) });
+    const response = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: state.sessionId, task, attachments: state.attachments.map((item) => item.path) }) });
     if (!response.ok) throw new Error((await response.json()).error || "请求失败");
     const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
-    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.textContent.includes(data.label)); if (node) { node.className = `tool-event ${data.status}`; node.textContent = `${data.status === "done" ? "✓" : "×"}  ${data.label}`; } } if (eventName === "complete") { setThinking(false); if (data.id) { state.sessionId = data.id; } if (Array.isArray(data.messages)) { state.messages = data.messages; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话"; } if (data.error) { renderMessages(state.messages); await loadSessions(); throw new Error(data.error); } renderMessages(state.messages); await loadSessions(); } } }
-  } catch (error) { setThinking(false); renderMessages([...state.messages, { role: "assistant", content: `请求失败：${error.message}` }]); } finally { state.sending = false; $("send").disabled = false; prompt.focus(); }
+    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.textContent.includes(data.label)); if (node) { node.className = `tool-event ${data.status}`; node.textContent = `${data.status === "done" ? "✓" : "×"}  ${data.label}`; } } if (eventName === "complete") { setThinking(false); if (data.id) { state.sessionId = data.id; } if (Array.isArray(data.messages)) { state.messages = data.messages; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话"; } if (data.error) { renderMessages(state.messages); await loadSessions(); throw new Error(data.error); } renderMessages(state.messages); state.attachments = []; renderAttachments(); setAttachmentNotice(""); await loadSessions(); } } }
+  } catch (error) { setThinking(false); renderMessages([...state.messages, { role: "assistant", content: `请求失败：${error.message}` }]); } finally { state.sending = false; $("send").disabled = false; $("attachments").disabled = false; prompt.focus(); }
 }
-$("composer").addEventListener("submit", sendTask); $("newChat").addEventListener("click", newChat); $("refresh").addEventListener("click", loadSessions); prompt.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); $("composer").requestSubmit(); } }); prompt.addEventListener("input", () => { prompt.style.height = "auto"; prompt.style.height = `${Math.min(prompt.scrollHeight, 180)}px`; });
+$("composer").addEventListener("submit", sendTask); $("newChat").addEventListener("click", newChat); $("refresh").addEventListener("click", loadSessions); $("attachments").addEventListener("change", handleAttachments); prompt.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); $("composer").requestSubmit(); } }); prompt.addEventListener("input", () => { prompt.style.height = "auto"; prompt.style.height = `${Math.min(prompt.scrollHeight, 180)}px`; });
 loadSessions();

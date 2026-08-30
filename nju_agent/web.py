@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import mimetypes
 import queue
 import threading
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -19,6 +22,18 @@ from .tools import LocalTools
 
 
 WEB_ROOT = Path(__file__).with_name("web")
+ATTACHMENT_ROOT_NAME = ".nju-agent-attachments"
+MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024
+MAX_ATTACHMENTS_PER_TURN = 10
+ALLOWED_ATTACHMENT_EXTENSIONS = frozenset(
+    {
+        ".bat", ".c", ".cc", ".cmake", ".cpp", ".css", ".csv", ".cxx", ".go", ".h", ".hpp",
+        ".htm", ".html", ".ini", ".java", ".js", ".json", ".jsonl", ".jsx", ".md", ".ps1",
+        ".py", ".pyi", ".rs", ".sh", ".sql", ".toml", ".ts", ".tsv", ".tsx", ".txt", ".xml",
+        ".yaml", ".yml",
+    }
+)
+ALLOWED_ATTACHMENT_FILENAMES = frozenset({"makefile", "dockerfile"})
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -50,10 +65,66 @@ class AgentWebHandler(BaseHTTPRequestHandler):
         self._static(parsed.path)
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path != "/api/chat/stream":
+        path = urlparse(self.path).path
+        if path == "/api/uploads":
+            self._upload()
+            return
+        if path != "/api/chat/stream":
             self._json_response({"error": "Not found"}, 404)
             return
         self._chat_stream()
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path.startswith("/api/sessions/"):
+            self._delete_session(unquote(parsed.path.rsplit("/", 1)[-1]))
+            return
+        self._json_response({"error": "Not found"}, 404)
+
+    def _read_json_body(self, *, maximum_bytes: int = 3 * 1024 * 1024) -> dict[str, Any]:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise ValueError("Invalid Content-Length") from exc
+        if length <= 0 or length > maximum_bytes:
+            raise ValueError(f"Request body must be between 1 byte and {maximum_bytes} bytes")
+        try:
+            value = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError as exc:
+            raise ValueError("Request body must be valid JSON") from exc
+        if not isinstance(value, dict):
+            raise ValueError("Request body must be a JSON object")
+        return value
+
+    def _upload(self) -> None:
+        try:
+            payload = self._read_json_body()
+            name = payload.get("name")
+            encoded = payload.get("content_base64")
+            if not isinstance(name, str) or Path(name).name != name or name in {"", ".", ".."}:
+                raise ValueError("Attachment name must be a plain file name")
+            if name.lower() not in ALLOWED_ATTACHMENT_FILENAMES and Path(name).suffix.lower() not in ALLOWED_ATTACHMENT_EXTENSIONS:
+                raise ValueError("Unsupported attachment type")
+            if not isinstance(encoded, str):
+                raise ValueError("Attachment content must be base64 text")
+            try:
+                content = base64.b64decode(encoded, validate=True)
+            except binascii.Error as exc:
+                raise ValueError("Attachment content must be valid base64") from exc
+            try:
+                content.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise ValueError("Attachment must be valid UTF-8 text") from exc
+            if len(content) > MAX_ATTACHMENT_BYTES:
+                raise ValueError(f"Attachment exceeds the {MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB limit")
+            relative = Path(ATTACHMENT_ROOT_NAME) / uuid.uuid4().hex / name
+            target = (self.server.workspace / relative).resolve()
+            target.parent.mkdir(parents=True, exist_ok=False)
+            target.write_bytes(content)
+        except (OSError, ValueError) as exc:
+            self._json_response({"error": str(exc)}, 400)
+            return
+        self._json_response({"name": name, "path": relative.as_posix(), "size": len(content)}, 201)
 
     def _sessions(self) -> None:
         try:
@@ -73,11 +144,26 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             return
         self._json_response({"id": session.id, "short_id": session.short_id, "updated_at": session.updated_at, "messages": _chat_messages(session)})
 
+    def _delete_session(self, session_id: str) -> None:
+        if not session_id:
+            self._json_response({"error": "Session ID is required"}, 400)
+            return
+        try:
+            deleted = self.server.store.delete(session_id)
+        except SessionError as exc:
+            self._json_response({"error": str(exc)}, 500)
+            return
+        if deleted is None:
+            self._json_response({"error": "Session not found"}, 404)
+            return
+        self._json_response({"deleted": True, "id": deleted.id, "short_id": deleted.short_id})
+
     def _chat_stream(self) -> None:
         try:
-            payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+            payload = self._read_json_body(maximum_bytes=128 * 1024)
             task = payload.get("task", "")
             requested_id = payload.get("session_id")
+            attachment_paths = self._attachment_paths(payload.get("attachments", []))
             if not isinstance(task, str) or not task.strip():
                 raise ValueError("task must be a non-empty string")
             if requested_id is not None and not isinstance(requested_id, str):
@@ -106,12 +192,14 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             events.put({"event": "model_response"})
 
         def run() -> None:
+            agent: Agent | None = None
             try:
                 agent = Agent(self.server.client_factory(), LocalTools(self.server.workspace), on_tool_start=on_start, on_tool_end=on_end, on_model_response=on_model_response)
                 if session.messages:
                     agent.plan.restore(session.plan)
-                answer = agent.run(task, history=session.messages if session.messages else None, resume=bool(session.messages))
-                session.messages = agent.last_messages
+                agent_task = self._task_with_attachments(task, attachment_paths)
+                answer = agent.run(agent_task, history=session.messages if session.messages else None, resume=bool(session.messages))
+                session.messages = self._persisted_messages(agent.last_messages, agent_task, task)
                 session.plan = agent.plan.snapshot()
                 self.server.store.save(session)
                 result.update({"id": session.id, "short_id": session.short_id, "answer": answer, "messages": _chat_messages(session)})
@@ -119,7 +207,7 @@ class AgentWebHandler(BaseHTTPRequestHandler):
                 # A new session should remain recoverable even if the first
                 # model call cannot leave this machine.
                 if agent is not None and agent.last_messages:
-                    session.messages = agent.last_messages
+                    session.messages = self._persisted_messages(agent.last_messages, self._task_with_attachments(task, attachment_paths), task)
                     session.plan = agent.plan.snapshot()
                 try:
                     self.server.store.save(session)
@@ -147,6 +235,41 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             self._sse(event)
         self._sse({"event": "complete", **result})
         self.close_connection = True
+
+    def _attachment_paths(self, values: Any) -> list[str]:
+        if values is None:
+            return []
+        if not isinstance(values, list) or len(values) > MAX_ATTACHMENTS_PER_TURN:
+            raise ValueError(f"attachments must contain at most {MAX_ATTACHMENTS_PER_TURN} files")
+        root = (self.server.workspace / ATTACHMENT_ROOT_NAME).resolve()
+        paths: list[str] = []
+        for value in values:
+            if not isinstance(value, str):
+                raise ValueError("attachment paths must be strings")
+            target = (self.server.workspace / value).resolve()
+            if root not in target.parents or not target.is_file():
+                raise ValueError("Attachment is unavailable or outside the upload area")
+            relative = target.relative_to(self.server.workspace).as_posix()
+            if relative not in paths:
+                paths.append(relative)
+        return paths
+
+    @staticmethod
+    def _task_with_attachments(task: str, paths: list[str]) -> str:
+        if not paths:
+            return task
+        listed = "\n".join(f"- {path}" for path in paths)
+        return f"{task}\n\n附件已保存到本地工作区。需要时请先使用 read_file 查看：\n{listed}"
+
+    @staticmethod
+    def _persisted_messages(messages: list[dict[str, Any]], agent_task: str, task: str) -> list[dict[str, Any]]:
+        """Keep attachment instructions out of the chat transcript shown to users."""
+        persisted = [dict(message) for message in messages]
+        for message in reversed(persisted):
+            if message.get("role") == "user" and message.get("content") == agent_task:
+                message["content"] = task
+                break
+        return persisted
 
     def _sse(self, event: dict[str, Any]) -> None:
         name = event.get("event", "message")

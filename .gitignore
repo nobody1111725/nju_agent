@@ -9,6 +9,7 @@ venv/
 *.log
 .nju-agent.log
 .nju-agent-sessions.json
+.nju-agent-attachments/
 .pytest_cache/
 dist/
 build/

@@ -45,7 +45,9 @@ nju-agent
 python -m nju_agent.cli --web
 ```
 
-然后在浏览器访问 `http://127.0.0.1:8765`。页面可新建或恢复会话、查看完整聊天记录，并实时显示文件读取、写入、编辑和命令执行的具体参数与状态；Agent 回复支持标题、列表、表格、代码块、行内代码、粗体和安全链接等 Markdown 格式。Web 服务只监听本机地址，继续使用现有本地工具和工作区会话文件。
+然后在浏览器访问 `http://127.0.0.1:8765`。页面可新建、恢复或删除会话、查看完整聊天记录，并实时显示文件读取、写入、编辑和命令执行的具体参数与状态；Agent 回复支持标题、列表、表格、代码块、行内代码、粗体和安全链接等 Markdown 格式。Web 服务只监听本机地址，继续使用现有本地工具和工作区会话文件。
+
+输入框左下角的回形针可添加代码或文本附件。支持 `.c`、`.cpp`、`.h`、`.hpp`、`.py`、`.json`、`.csv`、`.md` 等常用格式，以及 JavaScript、TypeScript、Java、Go、Rust、HTML/CSS、YAML、SQL、Shell、`Makefile` 和 `Dockerfile`。每轮最多 10 个附件、每个不超过 2 MB，且必须是 UTF-8 文本；附件保存在工作区的 `.nju-agent-attachments/` 下，任务执行时 Agent 会获知路径并按需用本地 `read_file` 工具读取。该目录外的路径、二进制文件和未允许格式会被拒绝。
 
 配置示例见 `.env.example`，默认面向 `deepseek-v4-pro`。可将配置复制到项目根目录的 `.env`，启动 CLI 即可发送真实任务。`.env` 和运行日志均已忽略，不会被提交；API Key 不能写入 README 或 Git 仓库。
 

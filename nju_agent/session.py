@@ -54,6 +54,16 @@ class SessionStore:
                 return session
         return None
 
+    def delete(self, session_id: str) -> Session | None:
+        """Delete one saved session by its full or short identifier."""
+        sessions = self.list()
+        selected = next((item for item in sessions if item.id == session_id or item.short_id == session_id), None)
+        if selected is None:
+            return None
+        payload = {"version": 1, "sessions": [_to_dict(item) for item in sessions if item.id != selected.id]}
+        self._write(payload)
+        return selected
+
     def save(self, session: Session) -> None:
         sessions = self.list()
         existing = next((item for item in sessions if item.id == session.id), None)
