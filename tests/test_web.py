@@ -63,6 +63,7 @@ class WebConversationTests(unittest.TestCase):
 
                 first = send("第一轮")
                 self.assertIn("event: model_response", first)
+                self.assertIn("event: answer", first)
                 first_event = complete_event(first)
                 second = send("第二轮", first_event["id"])
                 second_event = complete_event(second)

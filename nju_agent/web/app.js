@@ -1,6 +1,6 @@
 const MAX_ATTACHMENTS_PER_TURN = 10;
 const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
-const state = { sessionId: null, sending: false, uploading: false, messages: [], attachments: [], toolRuns: [] };
+const state = { sessionId: null, sending: false, uploading: false, messages: [], attachments: [], toolRuns: [], answerTyping: null, answerTypingTimer: null, pendingComplete: null };
 const $ = (id) => document.getElementById(id);
 const messages = $("messages");
 const prompt = $("prompt");
@@ -70,7 +70,73 @@ function renderMessages(items) {
     }
   }
   messages.querySelectorAll("details[data-run-id]").forEach((detail) => detail.addEventListener("toggle", () => saveToolRunOpen(detail.dataset.runId, detail.open)));
+  renderTypingAnswer();
   messages.scrollTop = messages.scrollHeight;
+}
+function stopAnswerTypingTimer() {
+  if (state.answerTypingTimer !== null) window.clearTimeout(state.answerTypingTimer);
+  state.answerTypingTimer = null;
+}
+function renderTypingAnswer() {
+  let node = messages.querySelector("#typingAnswer");
+  if (!state.answerTyping) { if (node) node.remove(); return; }
+  if (!node) {
+    node = document.createElement("article");
+    node.id = "typingAnswer";
+    node.className = "message agent";
+    node.innerHTML = '<div class="avatar agent">N</div><div class="message-content"><div class="message-body"></div></div>';
+    messages.appendChild(node);
+  }
+  const chars = Array.from(state.answerTyping.text);
+  const visible = chars.slice(0, state.answerTyping.index).join("");
+  const body = node.querySelector(".message-body");
+  body.innerHTML = `${markdownToHtml(visible)}<span class="typing-cursor" aria-hidden="true"></span>`;
+  messages.scrollTop = messages.scrollHeight;
+}
+function advanceAnswerTyping() {
+  const typing = state.answerTyping;
+  if (!typing) return;
+  const length = Array.from(typing.text).length;
+  if (typing.index < length) {
+    typing.index += 1;
+    renderTypingAnswer();
+  }
+  if (typing.index < length) {
+    state.answerTypingTimer = window.setTimeout(advanceAnswerTyping, 16);
+  } else {
+    state.answerTypingTimer = null;
+    if (state.pendingComplete) finishComplete(state.pendingComplete);
+  }
+}
+function startAnswerTyping(answer) {
+  stopAnswerTypingTimer();
+  state.pendingComplete = null;
+  state.answerTyping = { text: String(answer || ""), index: 0 };
+  setThinking(false);
+  renderTypingAnswer();
+  advanceAnswerTyping();
+}
+function finishComplete(data) {
+  stopAnswerTypingTimer();
+  state.answerTyping = null;
+  state.pendingComplete = null;
+  setThinking(false);
+  if (data.id) state.sessionId = data.id;
+  if (Array.isArray(data.messages)) {
+    state.messages = data.messages;
+    $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话";
+  }
+  if (Array.isArray(data.tool_runs)) state.toolRuns = data.tool_runs;
+  state.sending = false;
+  renderMessages(state.messages);
+  renderModifiedFiles();
+  if (data.error) throw new Error(data.error);
+  state.attachments = [];
+  renderAttachments();
+  setAttachmentNotice("");
+  $("send").disabled = false;
+  $("attachments").disabled = false;
+  prompt.focus();
 }
 function renderMessageAttachments(attachments) {
   const values = Array.isArray(attachments) ? attachments.filter((item) => item && typeof item.name === "string" && Number.isFinite(item.size)) : [];
@@ -139,7 +205,7 @@ async function openSession(id) {
   if (!response.ok) return;
   const data = await response.json(); state.sessionId = data.id; state.messages = Array.isArray(data.messages) ? data.messages : []; state.toolRuns = Array.isArray(data.tool_runs) ? data.tool_runs : []; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已恢复会话"; renderMessages(state.messages); renderModifiedFiles(); await loadSessions();
 }
-function newChat() { state.sessionId = null; state.messages = []; state.attachments = []; state.toolRuns = []; renderAttachments(); $("sessionTitle").textContent = "新对话"; renderMessages(state.messages); renderModifiedFiles(); loadSessions(); prompt.focus(); }
+function newChat() { stopAnswerTypingTimer(); state.answerTyping = null; state.pendingComplete = null; state.sessionId = null; state.messages = []; state.attachments = []; state.toolRuns = []; renderAttachments(); $("sessionTitle").textContent = "新对话"; renderMessages(state.messages); renderModifiedFiles(); loadSessions(); prompt.focus(); }
 async function deleteSession(id) {
   if (state.sending || state.uploading || !id) return;
   if (!window.confirm("确定删除这个会话及其全部聊天记录吗？此操作不可撤销。")) return;
@@ -214,8 +280,8 @@ async function sendTask(event) {
     const response = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: state.sessionId, task, attachments: state.attachments.map((item) => item.path) }) });
     if (!response.ok) throw new Error((await response.json()).error || "请求失败");
     const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
-    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.classList.contains("running")); if (node) { node.className = `tool-event ${data.status}`; node.innerHTML = `<span>${data.status === "done" ? "✓" : "×"}  ${escapeHtml(data.label)}</span>${renderDiff(data.diff) || ""}`; } } if (eventName === "complete") { setThinking(false); if (data.id) { state.sessionId = data.id; } if (Array.isArray(data.messages)) { state.messages = data.messages; $("sessionTitle").textContent = state.messages.find((m) => m.role === "user")?.content || "已保存会话"; } if (Array.isArray(data.tool_runs)) state.toolRuns = data.tool_runs; state.sending = false; renderMessages(state.messages); renderModifiedFiles(); if (data.error) { await loadSessions(); throw new Error(data.error); } state.attachments = []; renderAttachments(); setAttachmentNotice(""); await loadSessions(); } } }
-  } catch (error) { setThinking(false); state.sending = false; renderMessages([...state.messages, { role: "assistant", content: `请求失败：${error.message}` }]); } finally { state.sending = false; $("send").disabled = false; $("attachments").disabled = false; prompt.focus(); }
+    while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const chunks = buffer.split("\n\n"); buffer = chunks.pop(); for (const chunk of chunks) { const eventName = chunk.match(/^event: (.+)$/m)?.[1]; const dataLine = chunk.match(/^data: (.+)$/m)?.[1]; if (!dataLine) continue; const data = JSON.parse(dataLine); if (eventName === "model_response") setThinking(true); if (eventName === "tool_start") appendTool(data, true); if (eventName === "tool_end") { const nodes = [...$("toolRail").children]; const node = nodes.reverse().find((item) => item.classList.contains("running")); if (node) { node.className = `tool-event ${data.status}`; node.innerHTML = `<span>${data.status === "done" ? "✓" : "×"}  ${escapeHtml(data.label)}</span>${renderDiff(data.diff) || ""}`; } } if (eventName === "answer") startAnswerTyping(data.answer); if (eventName === "complete") { if (state.answerTyping && state.answerTyping.index < Array.from(state.answerTyping.text).length) state.pendingComplete = data; else { finishComplete(data); await loadSessions(); } } } }
+  } catch (error) { stopAnswerTypingTimer(); state.answerTyping = null; state.pendingComplete = null; setThinking(false); state.sending = false; renderMessages([...state.messages, { role: "assistant", content: `请求失败：${error.message}` }]); } finally { if (!state.answerTyping && !state.pendingComplete) { state.sending = false; $("send").disabled = false; $("attachments").disabled = false; prompt.focus(); } }
 }
 const composer = $("composer");
 composer.addEventListener("submit", sendTask); $("newChat").addEventListener("click", newChat); $("refresh").addEventListener("click", loadSessions); $("attachments").addEventListener("change", handleAttachments); composer.addEventListener("dragover", (event) => { if (Array.from(event.dataTransfer?.types || []).includes("Files")) { event.preventDefault(); composer.classList.add("dragging-files"); } }); composer.addEventListener("dragleave", (event) => { if (!composer.contains(event.relatedTarget)) composer.classList.remove("dragging-files"); }); composer.addEventListener("drop", (event) => { event.preventDefault(); composer.classList.remove("dragging-files"); if (event.dataTransfer?.files) uploadFiles([...event.dataTransfer.files]); }); prompt.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); composer.requestSubmit(); } }); prompt.addEventListener("input", () => { prompt.style.height = "auto"; prompt.style.height = `${Math.min(prompt.scrollHeight, 180)}px`; });

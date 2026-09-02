@@ -303,6 +303,10 @@ class AgentWebHandler(BaseHTTPRequestHandler):
                 session.plan = agent.plan.snapshot()
                 record_tool_run()
                 self.server.store.save(session)
+                # The model client currently returns a complete response. Send
+                # it as a separate event so the browser can present a typing
+                # animation before committing the persisted conversation.
+                events.put({"event": "answer", "answer": answer})
                 result.update({"id": session.id, "short_id": session.short_id, "answer": answer, "messages": _chat_messages(session), "tool_runs": session.tool_runs})
             except (AgentError, ModelError, SessionError) as exc:
                 # A new session should remain recoverable even if the first
